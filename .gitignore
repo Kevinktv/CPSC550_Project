@@ -1,0 +1,29 @@
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.xdv
+.DS_Store
+*.pdf
+*.bbl-SAVE-ERROR
+*.bak
+
+# Environments
+.env/
+.venv/
+venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+**/outdir/**
