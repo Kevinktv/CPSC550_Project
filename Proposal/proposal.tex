@@ -24,22 +24,22 @@
 \newtheorem{assumption}{Assumption}
 
 
-\title{Proposal}
-\author{XYZ}
+\title{Project Proposal on Qualitative Analysis of Machine Unlearning Algorithms}
+\author{Kevin \\ Inzaghi}
 \date{}
 
 \begin{document}
 \maketitle
-\section{Introduction}
-\lipsum[1] 
-\section{Motivation and background}
-\lipsum[2]
-\section{Related Work}
-\lipsum[3]
-\section{Problem statement}
-\lipsum[4]
-\section{Proposed approach}
-\lipsum[5]
-\section{References}
+\section{What problem you are focusing on?}
+In the field of privacy research, removing a particular dataset from a trained model is a difficult task. Although retraining a model from scratch to forget data is the best approach, it can be costly for complex or large models. Recently, there are new approximate unlearning algorithms have been published since the 2023 NeurIPS Unlearning Competition \cite{neurips-2023-machine-unlearning}, despite the fact that it established a formal evaluation framework. The goal of this project is to compare the qualitative performance of these more recent approaches to both the 2023 winning solution \cite{2023-winner} and an exact retraining.
+\section{What do you plan to do?}
+We plan to do an application bake-off by applying newly published unlearning techniques to the official NeurIPS 2023 Machine Unlearning dataset \cite{neurips-2023-machine-unlearning}. More specifically, we will:
+\begin{itemize}
+\item Use the provided dataset of approximately 30,000 images of human faces.
+\item Implement the more recent algorithm to unlearn using the contest dataset.
+\item Collectively evaluate the performance of these algorithms using the same evaluation framework as the 2023 Competition.
+\end{itemize}
+\section{What will the “contribution” be?}
+A clear benchmarks results of various approaches to the unlearning problem will be the contribution. This project will provide insights into whether more recent algorithms are better at forgetting when compared to the 2023 Competition Winners as a baseline by offering a qualitative comparison between exact retraining and recent approximate methods.
 \printbibliography
 \end{document}
