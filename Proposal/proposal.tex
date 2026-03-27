@@ -7,7 +7,7 @@
 \usepackage{xcolor}
 \geometry{margin=1in}
 
-\usepackage[backend=biber, style=numeric]{biblatex}
+\usepackage[backend=biber, style=authoryear]{biblatex}
 
 \addbibresource{refs.bib} % BibTeX file
 
@@ -23,6 +23,7 @@
 \newtheorem{lemma}{Lemma}[section]
 \newtheorem{assumption}{Assumption}
 
+\setlength{\parindent}{0pt}
 
 \title{Project Proposal on Qualitative Analysis of Machine Unlearning Algorithms}
 \author{Kevin \\ Inzaghi}
@@ -30,8 +31,33 @@
 
 \begin{document}
 \maketitle
+
+\section{Introduction}
+In the era of big data and machine learning, the ability to unlearn specific data from trained models has become increasingly important for privacy reasons. 
+Although retraining a model from scratch to forget data is the best approach, it can be costly for complex or large models. Recently, there are new approximate unlearning algorithms have been published since the 2023 NeurIPS Unlearning Competition \cite{neurips-2023-machine-unlearning}, despite the fact that it established a formal evaluation framework. 
+The goal of this project is to compare the qualitative performance of  more recent approaches to both the 2023 winning solution \cite{2023-winner} and an exact retraining. 
+is to compare the qualitative performance of these more recent approaches and provide a survey of common techniques in the field of machine unlearning. 
+
+\section{Problem setup}
+We base our problem setup on \cite{li2025overview}. We begin with some notation and definitions. Let $Z$ be the set of all data points and $Z^*$ be the set of all possible training datasets. Let $H$ be the set of all possible hypotheses (i.e. parameters). We define
+\begin{definition}[Learning Algorithm]
+    A learning algorithm $A: Z^* \to H$ maps a training dataset to a hypothesis. If $D \in Z^*$, then $A(D)$ is the model obtained by training on $D$.
+\end{definition}
+\begin{definition}[Unlearning Algorithm]
+    An unlearning algorithm $U: H \times Z^* \times Z^* \to H$ takes a model, a training dataset, and a subset of data points to unlearn, and produces a new model. Specifically, if $h = A(D)$ is the model trained on $D$, and $S \subseteq D$ is the subset of data points to unlearn, then $U(h, D, S)$ is the model obtained by unlearning $S$ from $h$.
+\end{definition}
+Note that both $A$ and $U$ can be randomized algorithms that define a distribution over the hypothesis space $H$. \\
+
+Suppose we have a training dataset $D \in Z^*$ and a subset of data points $S \subseteq D$ that we wish to unlearn. Let $D' = D \setminus S$. The goal of machine unlearning is to create an unlearning algorithm $U$ such that the distribution of $U(A(D), D, S)$ is close to the distribution of $A(D')$ (i.e. retraining the original model on the smaller dataset).
+i.e.
+\begin{equation}
+    Pr[A(D')] \approx Pr[U(A(D), D, S)]
+\end{equation} 
+Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. One common metric is based on differential privacy. (See \cite{dwork2014algorithmic} and \cite{sekhari2021remember}). The NeurIPS 2023 Unlearning Competition uses metrics based on differential privacy.
+
 \section{What problem you are focusing on?}
-In the field of privacy research, removing a particular dataset from a trained model is a difficult task. Although retraining a model from scratch to forget data is the best approach, it can be costly for complex or large models. Recently, there are new approximate unlearning algorithms have been published since the 2023 NeurIPS Unlearning Competition \cite{neurips-2023-machine-unlearning}, despite the fact that it established a formal evaluation framework. The goal of this project is to compare the qualitative performance of these more recent approaches to both the 2023 winning solution \cite{2023-winner} and an exact retraining.
+In the field of privacy research, removing a particular dataset from a trained model is a difficult task. Although retraining a model from scratch to forget data is the best approach, it can be costly for complex or large models. 
+Recently, there are new approximate unlearning algorithms have been published since the 2023 NeurIPS Unlearning Competition \cite{neurips-2023-machine-unlearning}, despite the fact that it established a formal evaluation framework. The goal of this project is to compare the qualitative performance of these more recent approaches to both the 2023 winning solution \cite{2023-winner} and an exact retraining.
 \section{What do you plan to do?}
 We plan to do an application bake-off by applying newly published unlearning techniques to the official NeurIPS 2023 Machine Unlearning dataset \cite{neurips-2023-machine-unlearning}. More specifically, we will:
 \begin{itemize}
