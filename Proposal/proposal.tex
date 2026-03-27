@@ -33,10 +33,9 @@
 \maketitle
 
 \section{Introduction}
-In the era of big data and machine learning, the ability to unlearn specific data from trained models has become increasingly important for privacy reasons. 
-Although retraining a model from scratch to forget data is the best approach, it can be costly for complex or large models. Recently, there are new approximate unlearning algorithms have been published since the 2023 NeurIPS Unlearning Competition \cite{neurips-2023-machine-unlearning}, despite the fact that it established a formal evaluation framework. 
-The goal of this project is to compare the qualitative performance of  more recent approaches to both the 2023 winning solution \cite{2023-winner} and an exact retraining. 
-is to compare the qualitative performance of these more recent approaches and provide a survey of common techniques in the field of machine unlearning. 
+In the era of big data, the ability to unlearn specific data from trained models has become increasingly important for privacy reasons. 
+Although retraining a model from scratch to forget data is the best approach, it is computationally expensive. This motivates the need for efficient approximate unlearning algorithms that do not require retraining. Following the 2023 NeurIPS Unlearning Competition \cite{neurips-2023-machine-unlearning}, several new approaches have been proposed. 
+This project compares their qualitative performance against the 2023 winning solution (\cite{2023-winner}) aims to provide a survey of the different approaches.
 
 \section{Problem setup}
 We base our problem setup on \cite{li2025overview}. We begin with some notation and definitions. Let $Z$ be the set of all data points and $Z^*$ be the set of all possible training datasets. Let $H$ be the set of all possible hypotheses (i.e. parameters). We define
