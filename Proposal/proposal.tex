@@ -52,12 +52,10 @@ i.e.
 \begin{equation}
     Pr[A(D')] \approx Pr[U(A(D), D, S)]
 \end{equation} 
-Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. One common metric is based on differential privacy. (See \cite{dwork2014algorithmic} and \cite{sekhari2021remember}). The NeurIPS 2023 Unlearning Competition uses metrics based on differential privacy.
+Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. One common metric is based on differential privacy. (See \cite{dwork2014algorithmic} and \cite{sekhari2021remember}). The NeurIPS 2023 Unlearning Competition uses metrics based on differential privacy. \\
 
-\section{What problem you are focusing on?}
-We will mainly focus on unlearning in the context of image classification on CIFAR-10 [\cite{Krizhevsky09learningmultiple}], Kaggle NeurIPS 2023 Machine Unlearning dataset [\cite{neurips-2023-machine-unlearning}], and MUFAC (Machine Unlearning Facial Attribute Classification) dataset [\cite{choi2023machine}]. 
 \section{What do you plan to do?}
-We plan to do a comparative review and benchmark of more recent unlearning classifier task. We will use ResNet-18 as a baseline model, retrain from scratch to get an exact unlearning baseline, and evaluate the same metrics used in Metric used for Kaggle competition (\cite{neurips-2023-machine-unlearning}).
+We plan to do a comparative review and benchmark of more recent unlearning algorithms for image classification. We will use ResNet-18 as a baseline model, retrain from scratch to get an exact unlearning baseline, and evaluate the same metrics used for the Kaggle competition (\cite{neurips-2023-machine-unlearning}).
 
 The algorithm we plan to compare are:
 \begin{itemize}
@@ -66,6 +64,9 @@ The algorithm we plan to compare are:
     \item SCRUB [\cite{kurmanji2023unboundedmachineunlearning}]
     \item DEcoupLEd Distillation To Erase (DELETE) [\cite{zhou2025decoupleddistillationerasegeneral}]
 \end{itemize}
+
+We will evaluate these algorithms on CIFAR-10 [\cite{Krizhevsky09learningmultiple}], Kaggle NeurIPS 2023 Machine Unlearning dataset [\cite{neurips-2023-machine-unlearning}], and MUFAC (Machine Unlearning Facial Attribute Classification) dataset [\cite{choi2023machine}]. 
+
 \section{What will the “contribution” be?}
 The main contribution of this project will be a clear and reproducible benchmark of recent machine unlearning algorithms on classification tasks under the same evaluation framework.
 \printbibliography
