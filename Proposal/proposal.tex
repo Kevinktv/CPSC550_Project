@@ -35,7 +35,7 @@
 \section{Introduction}
 In the era of big data, the ability to unlearn specific data from trained models has become increasingly important for privacy reasons. 
 Although retraining a model from scratch to forget data is the best approach, it is computationally expensive. This motivates the need for efficient approximate unlearning algorithms that do not require retraining. Following the 2023 NeurIPS Unlearning Competition \cite{neurips-2023-machine-unlearning}, several new approaches have been proposed. 
-This project compares their qualitative performance against the 2023 winning solution (\cite{2023-winner}) aims to provide a survey of the different approaches.
+This project compares their qualitative performance against the 2023 winning solution (\cite{2023-winner}) and aims to provide a survey of the different approaches.
 
 \section{Problem setup}
 We base our problem setup on \cite{li2025overview}. We begin with some notation and definitions. Let $Z$ be the set of all data points and $Z^*$ be the set of all possible training datasets. Let $H$ be the set of all possible hypotheses (i.e. parameters). We define
@@ -50,7 +50,7 @@ Note that both $A$ and $U$ can be randomized algorithms that define a distributi
 Suppose we have a training dataset $D \in Z^*$ and a subset of data points $S \subseteq D$ that we wish to unlearn. Let $D' = D \setminus S$. The goal of machine unlearning is to create an unlearning algorithm $U$ such that the distribution of $U(A(D), D, S)$ is close to the distribution of $A(D')$ (i.e. retraining the original model on the smaller dataset).
 i.e.
 \begin{equation}
-    Pr[A(D')] \approx Pr[U(A(D), D, S)]
+    \Pr[A(D')] \approx \Pr[U(A(D), D, S)]
 \end{equation} 
 Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. One common metric is based on differential privacy. (See \cite{dwork2014algorithmic} and \cite{sekhari2021remember}). The NeurIPS 2023 Unlearning Competition uses metrics based on differential privacy. \\
 
@@ -60,7 +60,7 @@ We plan to do a comparative review and benchmark of more recent unlearning algor
 The algorithm we plan to compare are:
 \begin{itemize}
     \item The 2023 NeurIPS Unlearning Competition winning solution [\cite{2023-winner}]
-    \item Masked Small Gradient + Convolution Transpose (CT) [\cite{cadet2025}]
+    \item Masked Small Gradient with Convolution Transpose (CT) [\cite{cadet2025}]
     \item SCRUB [\cite{kurmanji2023unboundedmachineunlearning}]
     \item DEcoupLEd Distillation To Erase (DELETE) [\cite{zhou2025decoupleddistillationerasegeneral}]
 \end{itemize}
@@ -68,6 +68,6 @@ The algorithm we plan to compare are:
 We will evaluate these algorithms on CIFAR-10 [\cite{Krizhevsky09learningmultiple}], Kaggle NeurIPS 2023 Machine Unlearning dataset [\cite{neurips-2023-machine-unlearning}], and MUFAC (Machine Unlearning Facial Attribute Classification) dataset [\cite{choi2023machine}]. 
 
 \section{What will the “contribution” be?}
-The main contribution of this project will be a clear and reproducible benchmark of recent machine unlearning algorithms on classification tasks under the same evaluation framework.
+The main contribution of this project will be a reproducibility report on Machine Unlearning algorithms, specifically Masked Small Gradient with Convolution Transpose (CT), SCRUB, and DELETE, evaluated against the exact unlearning baseline and the 2023 NeurIPS Unlearning Competition winning solution. By applying the competition's privacy metrics across diverse datasets, including CIFAR-10, MUFAC, and the Kaggle competition dataset. We will provide a quantitative analysis of the inherent trade-offs each method makes between unlearning efficacy (forgetting), retained model utility (accuracy), and computational efficiency.
 \printbibliography
 \end{document}
