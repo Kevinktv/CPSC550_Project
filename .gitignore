@@ -23,6 +23,10 @@
 .venv/
 venv/
 
+# datasets
+cifar-10/
+mufac/
+
 # Python bytecode
 __pycache__/
 *.py[cod]
