@@ -24,8 +24,9 @@
 venv/
 
 # datasets
-cifar-10/
-mufac/
+Code/data/cifar-10/
+Code/data/MUFAC/
+Code/data/mufac/
 
 # Python bytecode
 __pycache__/
