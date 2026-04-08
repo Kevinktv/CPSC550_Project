@@ -55,7 +55,7 @@ python generate_splits.py --forget-percentage 5.0 --forget-top-k-classes 2
 ### Reproducibility Verification (Audit Mode)
 Regenerate all artifacts into a temporary sandbox and perform a byte-for-byte comparison against your existing output directory. This ensures your currently saved manifests are uncorrupted and standard-compliant.
 ```bash
-python generate_splits.py --verify-only
+python generate_splits.py --verify-referenced-files
 ```
 
 ---

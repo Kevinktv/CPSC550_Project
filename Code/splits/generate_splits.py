@@ -90,6 +90,14 @@ def parse_args() -> argparse.Namespace:
         help="Regenerate into a temporary directory and compare against --out-root.",
     )
     parser.add_argument(
+        "--verify-referenced-files",
+        action="store_true",
+        help=(
+            "Verify that entries referenced by samples.csv and forget_mixed.json "
+            "resolve to on-disk dataset artifacts."
+        ),
+    )
+    parser.add_argument(
         "--forget-percentage",
         type=float,
         default=None,
@@ -539,6 +547,13 @@ def validate_task(task: dict[str, Any], known_ids: set[str]) -> None:
     test_ids = task["test_ids"]
 
     for field_name in ("train_ids", "forget_ids", "retrain_ids", "val_ids", "test_ids"):
+        counts = Counter(task[field_name])
+        duplicates = sorted(sample_id for sample_id, count in counts.items() if count > 1)
+        if duplicates:
+            raise ValueError(
+                f"{task['dataset']}::{task['task_id']} has duplicate IDs in {field_name}: "
+                f"{', '.join(duplicates[:5])}"
+            )
         unknown = sorted(set(task[field_name]) - known_ids)
         if unknown:
             raise ValueError(
@@ -1075,6 +1090,252 @@ def read_task_manifests(task_root: Path) -> list[dict[str, Any]]:
     return manifests
 
 
+def collect_task_sample_ids(task: dict[str, Any]) -> list[str]:
+    """Collect all sample IDs referenced by one task manifest."""
+    referenced_ids: list[str] = []
+    for field_name in ("train_ids", "forget_ids", "retrain_ids", "val_ids", "test_ids"):
+        referenced_ids.extend(task.get(field_name, []))
+    return referenced_ids
+
+
+def build_dataset_file_index(dataset_data_root: Path) -> tuple[set[str], dict[str, list[str]]]:
+    """Index files in one dataset root by relative path and basename."""
+    exact_paths: set[str] = set()
+    basename_to_paths: dict[str, list[str]] = defaultdict(list)
+    for path in dataset_data_root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative_path = path.relative_to(dataset_data_root).as_posix()
+        exact_paths.add(relative_path)
+        basename_to_paths[path.name].append(relative_path)
+    return exact_paths, dict(basename_to_paths)
+
+
+def resolve_dataset_reference(
+    reference: str,
+    exact_paths: set[str],
+    basename_to_paths: dict[str, list[str]],
+) -> list[str]:
+    """Resolve a manifest or CSV file reference against the dataset tree."""
+    normalized = Path(reference).as_posix()
+    if normalized in exact_paths:
+        return [normalized]
+    return sorted(basename_to_paths.get(Path(normalized).name, []))
+
+
+def verify_mufac_referenced_files(
+    data_root: Path,
+    dataset_root: Path,
+) -> dict[str, Any]:
+    """Verify that MUFAC catalog and task entries resolve to real image files."""
+    dataset_data_root = data_root / "MUFAC"
+    samples = read_samples_csv(dataset_root / "samples.csv")
+    tasks = read_task_manifests(dataset_root / "tasks")
+    if len(tasks) != 1:
+        raise ValueError(f"Expected exactly one MUFAC task manifest, found {len(tasks)}")
+
+    task = tasks[0]
+    sample_lookup = {row["sample_id"]: row for row in samples}
+    exact_paths, basename_to_paths = build_dataset_file_index(dataset_data_root)
+    missing_catalog_paths: list[str] = []
+    relocated_catalog_paths: list[dict[str, Any]] = []
+    for row in samples:
+        relative_path = row["relative_path"]
+        if not relative_path:
+            continue
+        resolved_paths = resolve_dataset_reference(
+            relative_path,
+            exact_paths,
+            basename_to_paths,
+        )
+        if not resolved_paths:
+            missing_catalog_paths.append(relative_path)
+        elif relative_path not in exact_paths:
+            relocated_catalog_paths.append(
+                {
+                    "requested": relative_path,
+                    "resolved_paths": resolved_paths,
+                }
+            )
+
+    unknown_manifest_ids = sorted(
+        sample_id for sample_id in collect_task_sample_ids(task) if sample_id not in sample_lookup
+    )
+    missing_manifest_paths = sorted({
+            sample_lookup[sample_id]["relative_path"]
+            for sample_id in collect_task_sample_ids(task)
+            if sample_id in sample_lookup
+            and sample_lookup[sample_id]["relative_path"]
+            and not resolve_dataset_reference(
+                sample_lookup[sample_id]["relative_path"],
+                exact_paths,
+                basename_to_paths,
+            )
+        })
+    missing_extra_eval_paths = sorted(
+        {
+            relative_path
+            for paths in task.get("extra_eval_sets", {}).values()
+            for relative_path in paths
+            if not resolve_dataset_reference(relative_path, exact_paths, basename_to_paths)
+        }
+    )
+
+    return {
+        "dataset": "mufac",
+        "sample_rows_checked": len(samples),
+        "task_references_checked": len(collect_task_sample_ids(task)),
+        "missing_catalog_paths": missing_catalog_paths,
+        "relocated_catalog_paths": relocated_catalog_paths,
+        "unknown_manifest_ids": unknown_manifest_ids,
+        "missing_manifest_paths": missing_manifest_paths,
+        "missing_extra_eval_paths": missing_extra_eval_paths,
+        "all_references_present": not (
+            missing_catalog_paths
+            or unknown_manifest_ids
+            or missing_manifest_paths
+            or missing_extra_eval_paths
+        ),
+    }
+
+
+def verify_cifar10_referenced_files(
+    data_root: Path,
+    dataset_root: Path,
+) -> dict[str, Any]:
+    """Verify that CIFAR-10 catalog and task entries resolve to valid dataset records."""
+    samples = read_samples_csv(dataset_root / "samples.csv")
+    tasks = read_task_manifests(dataset_root / "tasks")
+    if len(tasks) != 1:
+        raise ValueError(f"Expected exactly one CIFAR-10 task manifest, found {len(tasks)}")
+
+    task = tasks[0]
+    sample_lookup = {row["sample_id"]: row for row in samples}
+    train_labels, test_labels, class_names, source_name = load_cifar10_labels(data_root)
+
+    if class_names != CIFAR10_CLASSES:
+        raise ValueError(f"Unexpected CIFAR-10 class order: {class_names}")
+
+    invalid_catalog_rows: list[dict[str, Any]] = []
+    for row in samples:
+        source_partition = row["source_partition"]
+        raw_index = row["raw_index"]
+        label_id = int(row["label_id"])
+        label_name = row["label_name"]
+        relative_path = row["relative_path"]
+
+        if relative_path:
+            invalid_catalog_rows.append(
+                {
+                    "sample_id": row["sample_id"],
+                    "reason": "relative_path should be empty for CIFAR-10",
+                }
+            )
+            continue
+
+        if source_partition == "official_train":
+            if not 0 <= raw_index < len(train_labels):
+                invalid_catalog_rows.append(
+                    {"sample_id": row["sample_id"], "reason": f"train raw_index out of range: {raw_index}"}
+                )
+                continue
+            expected_label_id = train_labels[raw_index]
+        elif source_partition == "official_test":
+            if not 0 <= raw_index < len(test_labels):
+                invalid_catalog_rows.append(
+                    {"sample_id": row["sample_id"], "reason": f"test raw_index out of range: {raw_index}"}
+                )
+                continue
+            expected_label_id = test_labels[raw_index]
+        else:
+            invalid_catalog_rows.append(
+                {
+                    "sample_id": row["sample_id"],
+                    "reason": f"unexpected source_partition: {source_partition}",
+                }
+            )
+            continue
+
+        expected_label_name = class_names[expected_label_id]
+        if label_id != expected_label_id or label_name != expected_label_name:
+            invalid_catalog_rows.append(
+                {
+                    "sample_id": row["sample_id"],
+                    "reason": (
+                        f"label mismatch: expected ({expected_label_id}, {expected_label_name}) "
+                        f"but found ({label_id}, {label_name})"
+                    ),
+                }
+            )
+
+    unknown_manifest_ids = sorted(
+        sample_id for sample_id in collect_task_sample_ids(task) if sample_id not in sample_lookup
+    )
+
+    return {
+        "dataset": "cifar10",
+        "cifar_source_backend": source_name,
+        "sample_rows_checked": len(samples),
+        "task_references_checked": len(collect_task_sample_ids(task)),
+        "invalid_catalog_rows": invalid_catalog_rows,
+        "unknown_manifest_ids": unknown_manifest_ids,
+        "all_references_present": not (invalid_catalog_rows or unknown_manifest_ids),
+    }
+
+
+def print_reference_verification_report(report: dict[str, Any]) -> None:
+    """Print a compact human-readable verification summary."""
+    dataset = report["dataset"]
+    print(f"[{dataset}] sample rows checked: {report['sample_rows_checked']}")
+    print(f"[{dataset}] task references checked: {report['task_references_checked']}")
+    if "cifar_source_backend" in report:
+        print(f"[{dataset}] CIFAR source backend: {report['cifar_source_backend']}")
+
+    error_fields = [
+        "missing_catalog_paths",
+        "unknown_manifest_ids",
+        "missing_manifest_paths",
+        "missing_extra_eval_paths",
+        "invalid_catalog_rows",
+        "relocated_catalog_paths",
+    ]
+    for field_name in error_fields:
+        values = report.get(field_name)
+        if not values:
+            continue
+        print(f"[{dataset}] {field_name}: {len(values)}")
+        for item in values[:10]:
+            print(f"  - {item}")
+        if len(values) > 10:
+            print(f"  - ... {len(values) - 10} more")
+
+
+def verify_referenced_files(
+    data_root: Path,
+    out_root: Path,
+    datasets: list[str],
+) -> None:
+    """Verify that samples.csv and task manifests point to real dataset artifacts."""
+    verifiers = {
+        "cifar10": verify_cifar10_referenced_files,
+        "mufac": verify_mufac_referenced_files,
+    }
+    reports: list[dict[str, Any]] = []
+    for dataset in datasets:
+        dataset_root = out_root / dataset
+        if not dataset_root.exists():
+            raise FileNotFoundError(f"Missing generated split directory: {dataset_root}")
+        report = verifiers[dataset](data_root, dataset_root)
+        print_reference_verification_report(report)
+        reports.append(report)
+
+    failing = [report["dataset"] for report in reports if not report["all_references_present"]]
+    if failing:
+        raise ValueError(
+            "Referenced-file verification failed for: " + ", ".join(sorted(failing))
+        )
+
+
 def generate_selected(
     data_root: Path,
     out_root: Path,
@@ -1201,6 +1462,15 @@ def main() -> None:
             forget_top_k_classes,
         )
         print(f"Verified canonical splits for: {', '.join(datasets)}")
+        return
+
+    if args.verify_referenced_files:
+        verify_referenced_files(
+            data_root,
+            out_root,
+            datasets,
+        )
+        print(f"Verified referenced dataset files for: {', '.join(datasets)}")
         return
 
     generate_selected(
