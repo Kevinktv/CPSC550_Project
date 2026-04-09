@@ -1,0 +1,110 @@
+[
+  {
+    "config_index": 4,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.05,
+    "weight_decay": 0.0001,
+    "best_val_accuracy": 0.4649050371593724,
+    "final_val_accuracy": 0.4599504541701073,
+    "runtime_seconds": 748.5503622999968,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg04\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 6,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.05,
+    "weight_decay": 0.001,
+    "best_val_accuracy": 0.4632535094962841,
+    "final_val_accuracy": 0.4599504541701073,
+    "runtime_seconds": 749.9748533999955,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg06\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 5,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.05,
+    "weight_decay": 0.0005,
+    "best_val_accuracy": 0.4591246903385632,
+    "final_val_accuracy": 0.4475639966969447,
+    "runtime_seconds": 749.1861503999971,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg05\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 9,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.08,
+    "weight_decay": 0.001,
+    "best_val_accuracy": 0.4393063583815029,
+    "final_val_accuracy": 0.4153592072667217,
+    "runtime_seconds": 750.8678443999961,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg09\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 7,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.08,
+    "weight_decay": 0.0001,
+    "best_val_accuracy": 0.435177539223782,
+    "final_val_accuracy": 0.4318744838976053,
+    "runtime_seconds": 749.2186574999942,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg07\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 8,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.08,
+    "weight_decay": 0.0005,
+    "best_val_accuracy": 0.43352601156069365,
+    "final_val_accuracy": 0.3674649050371594,
+    "runtime_seconds": 748.9189781000023,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg08\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 2,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.02,
+    "weight_decay": 0.0005,
+    "best_val_accuracy": 0.43022295623451695,
+    "final_val_accuracy": 0.41453344343517756,
+    "runtime_seconds": 748.8416829000053,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg02\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 3,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.02,
+    "weight_decay": 0.001,
+    "best_val_accuracy": 0.42857142857142855,
+    "final_val_accuracy": 0.41288191577208916,
+    "runtime_seconds": 747.8237554999941,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg03\\seed_0.pth",
+    "seed": 0
+  },
+  {
+    "config_index": 1,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.02,
+    "weight_decay": 0.0001,
+    "best_val_accuracy": 0.4236168455821635,
+    "final_val_accuracy": 0.41040462427745666,
+    "runtime_seconds": 784.8131333000056,
+    "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg01\\seed_0.pth",
+    "seed": 0
+  }
+]

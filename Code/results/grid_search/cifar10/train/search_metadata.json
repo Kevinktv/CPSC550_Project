@@ -1,0 +1,161 @@
+{
+  "dataset": "cifar10",
+  "train_split": "train",
+  "epochs": 25,
+  "seed": 0,
+  "class_weighting": "auto",
+  "momentum": 0.9,
+  "image_size": 32,
+  "search_space_signature": [
+    {
+      "batch_size": 64,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.001,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.01,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.01,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.05,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.05,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.1,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.1,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.5,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 64,
+      "learning_rate": 0.5,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.001,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.01,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.01,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.05,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.05,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.1,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.1,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.5,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.5,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.001,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.01,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.01,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.05,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.05,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.1,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.1,
+      "weight_decay": 0.005
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.5,
+      "weight_decay": 1e-05
+    },
+    {
+      "batch_size": 256,
+      "learning_rate": 0.5,
+      "weight_decay": 0.005
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "dataset": "mufac",
+  "train_split": "train",
+  "epochs": 40,
+  "seed": 0,
+  "class_weighting": "auto",
+  "momentum": 0.9,
+  "image_size": 224,
+  "search_space_signature": [
+    {
+      "batch_size": 128,
+      "learning_rate": 0.02,
+      "weight_decay": 0.0001
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.02,
+      "weight_decay": 0.0005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.02,
+      "weight_decay": 0.001
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.05,
+      "weight_decay": 0.0001
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.05,
+      "weight_decay": 0.0005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.05,
+      "weight_decay": 0.001
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.08,
+      "weight_decay": 0.0001
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.08,
+      "weight_decay": 0.0005
+    },
+    {
+      "batch_size": 128,
+      "learning_rate": 0.08,
+      "weight_decay": 0.001
+    }
+  ]
+}

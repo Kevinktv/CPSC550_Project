@@ -1,0 +1,12 @@
+{
+  "config_index": 4,
+  "train_split": "train",
+  "batch_size": 128,
+  "learning_rate": 0.05,
+  "weight_decay": 0.0001,
+  "best_val_accuracy": 0.4649050371593724,
+  "final_val_accuracy": 0.4599504541701073,
+  "runtime_seconds": 748.5503622999968,
+  "checkpoint_path": "checkpoints\\mufac\\forget_mixed\\grid_search_train_cfg04\\seed_0.pth",
+  "seed": 0
+}

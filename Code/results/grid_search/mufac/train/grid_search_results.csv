@@ -1,0 +1,10 @@
+config_index,train_split,batch_size,learning_rate,weight_decay,best_val_accuracy,final_val_accuracy,runtime_seconds,checkpoint_path,seed
+4,train,128,0.05,0.0001,0.4649050371593724,0.4599504541701073,748.5503622999968,checkpoints\mufac\forget_mixed\grid_search_train_cfg04\seed_0.pth,0
+6,train,128,0.05,0.001,0.4632535094962841,0.4599504541701073,749.9748533999955,checkpoints\mufac\forget_mixed\grid_search_train_cfg06\seed_0.pth,0
+5,train,128,0.05,0.0005,0.4591246903385632,0.4475639966969447,749.1861503999971,checkpoints\mufac\forget_mixed\grid_search_train_cfg05\seed_0.pth,0
+9,train,128,0.08,0.001,0.4393063583815029,0.4153592072667217,750.8678443999961,checkpoints\mufac\forget_mixed\grid_search_train_cfg09\seed_0.pth,0
+7,train,128,0.08,0.0001,0.435177539223782,0.4318744838976053,749.2186574999942,checkpoints\mufac\forget_mixed\grid_search_train_cfg07\seed_0.pth,0
+8,train,128,0.08,0.0005,0.43352601156069365,0.3674649050371594,748.9189781000023,checkpoints\mufac\forget_mixed\grid_search_train_cfg08\seed_0.pth,0
+2,train,128,0.02,0.0005,0.43022295623451695,0.41453344343517756,748.8416829000053,checkpoints\mufac\forget_mixed\grid_search_train_cfg02\seed_0.pth,0
+3,train,128,0.02,0.001,0.42857142857142855,0.41288191577208916,747.8237554999941,checkpoints\mufac\forget_mixed\grid_search_train_cfg03\seed_0.pth,0
+1,train,128,0.02,0.0001,0.4236168455821635,0.41040462427745666,784.8131333000056,checkpoints\mufac\forget_mixed\grid_search_train_cfg01\seed_0.pth,0

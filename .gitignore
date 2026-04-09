@@ -27,6 +27,9 @@ venv/
 Code/data/cifar-10/
 Code/data/MUFAC/
 Code/data/mufac/
+wandb/
+wandb-local/
+checkpoints/
 
 # Python bytecode
 __pycache__/
