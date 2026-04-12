@@ -17,6 +17,11 @@ except ImportError:  # pragma: no cover - depends on local environment.
     pd = None
 
 try:
+    import wandb
+except ImportError:  # pragma: no cover - depends on local environment.
+    wandb = None
+
+try:
     import torch
 except ImportError:  # pragma: no cover - depends on local environment.
     torch = None
@@ -32,6 +37,7 @@ try:
         compute_split_class_counts,
         default_epochs,
         fit_model,
+        init_wandb_run,
         resolve_class_weighting,
         resolve_wandb_project,
         train_one_epoch,
@@ -47,6 +53,7 @@ except ImportError:  # pragma: no cover - allows direct module execution.
         compute_split_class_counts,
         default_epochs,
         fit_model,
+        init_wandb_run,
         resolve_class_weighting,
         resolve_wandb_project,
         train_one_epoch,
@@ -807,10 +814,12 @@ def run_benchmark_notebook_workflow(
     device_name: str = "auto",
     batch_size: int = 128,
     image_size: int | None = None,
+    use_wandb: bool = False,
+    wandb_project: str = "benchmark",
 ) -> dict[str, Any]:
     """Benchmark baseline and placeholder-unlearning families."""
 
-    samples_path, task_path, _ = resolve_pipeline_paths(dataset, samples_csv, task_manifest, data_root)
+    samples_path, task_path, data_root_path = resolve_pipeline_paths(dataset, samples_csv, task_manifest, data_root)
     task_data = json.loads(Path(task_path).read_text(encoding="utf-8"))
     task_id = task_data["task_id"]
     family_dirs = {
@@ -836,4 +845,77 @@ def run_benchmark_notebook_workflow(
     output_path = results_root / "benchmark_report.json"
     output_path.write_text(json.dumps(benchmark, indent=2), encoding="utf-8")
     benchmark["report_path"] = str(output_path)
+    benchmark_config = {
+        "dataset": dataset,
+        "task_id": task_id,
+        "reference_family": baseline_retrain_family,
+        "family_names": list(family_dirs.keys()),
+        "family_dirs": {name: str(path) for name, path in family_dirs.items()},
+        "efficiency_ratio": float(efficiency_ratio),
+        "device_name": device_name,
+        "batch_size": int(batch_size),
+        "image_size": int(resolve_image_size(dataset, image_size)),
+        "report_path": str(output_path),
+        "samples_csv": str(samples_path),
+        "task_manifest": str(task_path),
+        "data_root": str(data_root_path),
+    }
+    wandb_run = init_wandb_run(
+        enabled=use_wandb,
+        entity="inmdev-university-of-british-columbia",
+        project=wandb_project,
+        run_name=f"benchmark_{dataset}_{task_id}",
+        config=benchmark_config,
+    )
+    benchmark_metrics: dict[str, Any] = {}
+    for family_name, summary in benchmark["family_summaries"].items():
+        for metric_name, metric_value in summary.items():
+            benchmark_metrics[f"family/{family_name}/{metric_name}"] = metric_value
+    for family_name, comparison in benchmark["comparisons_to_reference"].items():
+        benchmark_metrics[f"comparison/{family_name}/forgetting_quality"] = comparison["forgetting_quality"]
+        benchmark_metrics[f"comparison/{family_name}/passed_efficiency_cutoff"] = comparison["passed_efficiency_cutoff"]
+        if comparison["final_score"] is not None:
+            benchmark_metrics[f"comparison/{family_name}/final_score"] = comparison["final_score"]
+        benchmark_metrics[f"comparison/{family_name}/candidate_runtime_mean"] = comparison["runtime_seconds"]["candidate_mean"]
+        benchmark_metrics[f"comparison/{family_name}/reference_runtime_mean"] = comparison["runtime_seconds"]["reference_mean"]
+        benchmark_metrics[f"comparison/{family_name}/candidate_retain_accuracy"] = comparison["retain_accuracy"]["candidate_mean"]
+        benchmark_metrics[f"comparison/{family_name}/reference_retain_accuracy"] = comparison["retain_accuracy"]["reference_mean"]
+        benchmark_metrics[f"comparison/{family_name}/candidate_test_accuracy"] = comparison["test_accuracy"]["candidate_mean"]
+        benchmark_metrics[f"comparison/{family_name}/reference_test_accuracy"] = comparison["test_accuracy"]["reference_mean"]
+    wandb_run.log(benchmark_metrics)
+    if use_wandb and wandb is not None:
+        family_rows = [
+            {"family": family_name, **summary}
+            for family_name, summary in benchmark["family_summaries"].items()
+        ]
+        comparison_rows = [
+            {
+                "family": family_name,
+                "forgetting_quality": comparison["forgetting_quality"],
+                "passed_efficiency_cutoff": comparison["passed_efficiency_cutoff"],
+                "final_score": comparison["final_score"],
+                "candidate_runtime_mean": comparison["runtime_seconds"]["candidate_mean"],
+                "reference_runtime_mean": comparison["runtime_seconds"]["reference_mean"],
+                "candidate_retain_accuracy": comparison["retain_accuracy"]["candidate_mean"],
+                "reference_retain_accuracy": comparison["retain_accuracy"]["reference_mean"],
+                "candidate_test_accuracy": comparison["test_accuracy"]["candidate_mean"],
+                "reference_test_accuracy": comparison["test_accuracy"]["reference_mean"],
+            }
+            for family_name, comparison in benchmark["comparisons_to_reference"].items()
+        ]
+        if family_rows:
+            family_columns = list(family_rows[0].keys())
+            family_table = wandb.Table(
+                columns=family_columns,
+                data=[[row[column] for column in family_columns] for row in family_rows],
+            )
+            wandb_run.log({"family_summaries_table": family_table})
+        if comparison_rows:
+            comparison_columns = list(comparison_rows[0].keys())
+            comparison_table = wandb.Table(
+                columns=comparison_columns,
+                data=[[row[column] for column in comparison_columns] for row in comparison_rows],
+            )
+            wandb_run.log({"comparisons_table": comparison_table})
+    wandb_run.finish()
     return benchmark

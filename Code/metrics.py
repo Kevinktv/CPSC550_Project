@@ -175,17 +175,24 @@ def _compute_example_epsilon(fprs: np.ndarray, fnrs: np.ndarray, delta: float = 
 
     per_attack_epsilons: list[float] = []
     for fpr, fnr in zip(fprs, fnrs):
-        if fpr == 0.0 and fnr == 0.0:
+        if fpr <= 0.0 and fnr <= 0.0:
             per_attack_epsilons.append(float("inf"))
             continue
-        if fpr == 0.0 or fnr == 0.0:
+        if fpr <= 0.0 or fnr <= 0.0 or (1 - delta - fpr) <= 0 or (1 - delta - fnr) <= 0:
             continue
+        
+        # epsilon_1
         first = math.log(1 - delta - fpr) - math.log(fnr)
+        
+        #epsilon_2
         second = math.log(1 - delta - fnr) - math.log(fpr)
+        
+        #epsilon^s = max(epsilon_1, epsilon_2)
         per_attack_epsilons.append(float(np.nanmax([first, second])))
 
     if not per_attack_epsilons:
         return float("nan")
+    
     return float(np.nanmax(per_attack_epsilons))
 
 
@@ -223,19 +230,25 @@ def _score_epsilons(epsilons: list[float], num_models: int) -> float:
 
     max_epsilon = float(np.ceil(np.log(num_models - 1)))
     bucket_start = 0.0
-    points = 1.0
+    n = 1  # Bin index starts at 1
+    
+    # H(s) is bucket_points[s]
     bucket_points: dict[float, float] = {}
     while bucket_start + BUCKET_SIZE <= max_epsilon:
-        bucket_points[bucket_start] = points
-        points /= 2.0
+        bucket_points[bucket_start] = 2.0 / (2.0 ** n) # H(s) = 2 / 2^n
+        n += 1
         bucket_start += BUCKET_SIZE
 
+
+    # Calculating sum_{s in S} H(s)
     total_score = 0.0
     for epsilon in epsilons:
         for start, bucket_score in bucket_points.items():
             if epsilon < start + BUCKET_SIZE:
                 total_score += bucket_score
                 break
+    
+    # F = 1/|S| * sum_{s in S} H(s)
     return total_score / len(epsilons) if epsilons else 0.0
 
 

@@ -1,0 +1,21 @@
+{
+  "selection_mode": "reuse_train_best",
+  "source_split": "train",
+  "selected_on_split": "train",
+  "applied_to_split": "retrain",
+  "source_best_config_path": "results\\grid_search\\cifar10\\train\\best_config.json",
+  "best_result": {
+    "config_index": 15,
+    "train_split": "train",
+    "batch_size": 128,
+    "learning_rate": 0.05,
+    "weight_decay": 1e-05,
+    "best_val_accuracy": 0.8454,
+    "final_val_accuracy": 0.8432,
+    "runtime_seconds": 404.1005107000019,
+    "checkpoint_path": "checkpoints\\cifar10\\forget_mixed\\grid_search_train_cfg15\\seed_0.pth",
+    "seed": 0,
+    "epochs": 25
+  },
+  "results_dir": "results\\grid_search\\cifar10\\retrain"
+}

@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+from tqdm.auto import tqdm
+
 try:
     import torch
 except ImportError:  # pragma: no cover - depends on local environment.
@@ -81,7 +83,7 @@ def evaluate_checkpoint_bank(
     confidence_rows: list[np.ndarray] = []
     expected_targets: np.ndarray | None = None
 
-    for checkpoint_path in checkpoint_paths:
+    for checkpoint_path in tqdm(checkpoint_paths, desc="Evaluating Checkpoints", leave=False):
         metadata = load_checkpoint_metadata(checkpoint_path)
         runtimes.append(float(metadata["runtime_seconds"]))
         model = build_model(model_factory, num_classes=context.num_classes, dataset=context.dataset).to(device)
@@ -151,6 +153,7 @@ def compare_candidate_to_reference(
     passed_efficiency_cutoff = candidate_runtime_mean <= (efficiency_ratio * retrain_runtime_mean)
     final_score = None
     if passed_efficiency_cutoff and rar > 0.0 and tar > 0.0:
+        # score = F * (rau / rar) * (tau / tar)
         final_score = forgetting_quality * (rau / rar) * (tau / tar)
     return {
         "forgetting_quality": forgetting_quality,
@@ -211,7 +214,7 @@ def benchmark_model_families(
     )
     bank_by_family: dict[str, dict[str, Any]] = {}
     summaries: dict[str, dict[str, Any]] = {}
-    for family_name, directory in family_dirs.items():
+    for family_name, directory in tqdm(list(family_dirs.items()), desc="Benchmarking Families"):
         checkpoint_paths = list_checkpoints(directory)
         bank = evaluate_checkpoint_bank(checkpoint_paths, data_bundle=data_bundle, device=device, model_factory=model_factory)
         bank_by_family[family_name] = bank
