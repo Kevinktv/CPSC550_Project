@@ -4,9 +4,9 @@
   "batch_size": 128,
   "learning_rate": 0.05,
   "weight_decay": 1e-05,
-  "best_val_accuracy": 0.8454,
-  "final_val_accuracy": 0.8432,
-  "runtime_seconds": 404.1005107000019,
+  "best_val_accuracy": 0.8518,
+  "final_val_accuracy": 0.8494,
+  "runtime_seconds": 609.818664299999,
   "checkpoint_path": "checkpoints\\cifar10\\forget_mixed\\grid_search_train_cfg15\\seed_0.pth",
   "seed": 0
 }

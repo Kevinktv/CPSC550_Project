@@ -1,7 +1,7 @@
 {
   "dataset": "cifar10",
   "train_split": "train",
-  "epochs": 25,
+  "epochs": 40,
   "seed": 0,
   "class_weighting": "auto",
   "momentum": 0.9,

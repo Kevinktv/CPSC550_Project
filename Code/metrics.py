@@ -13,6 +13,12 @@ try:
 except ImportError:  # pragma: no cover - depends on local environment.
     torch = None
 
+try:
+    from tqdm.auto import tqdm
+except ImportError:  # pragma: no cover - depends on local environment.
+    def tqdm(iterable: Any, *args: Any, **kwargs: Any) -> Any:
+        return iterable
+
 
 DELTA = 1e-5
 EPSILON_CAP = 50.0
@@ -108,26 +114,31 @@ def compute_logit_scaled_confidence(logits: np.ndarray | Any, targets: np.ndarra
 def _get_single_threshold_rates(
     pos_confs: np.ndarray,
     neg_confs: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[float]]:
-    all_confs = np.concatenate([pos_confs, neg_confs], axis=0)
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    pos_arr = np.asarray(pos_confs, dtype=np.float64)
+    neg_arr = np.asarray(neg_confs, dtype=np.float64)
+    all_confs = np.concatenate([pos_arr, neg_arr], axis=0)
     min_val = float(np.min(all_confs))
     max_val = float(np.max(all_confs))
     num_thresholds = max(1, int(np.ceil((max_val - min_val) * NUM_THRESHOLDS_PER_UNIT)))
     thresholds = np.linspace(min_val, max_val, num=num_thresholds)
-    pos_matrix = pos_confs[:, None]
-    neg_matrix = neg_confs[:, None]
-    threshold_matrix = thresholds[None, :]
-    tpr = np.mean(pos_matrix >= threshold_matrix, axis=0)
-    fpr = np.mean(neg_matrix >= threshold_matrix, axis=0)
-    tnr = np.mean(neg_matrix < threshold_matrix, axis=0)
-    fnr = np.mean(pos_matrix < threshold_matrix, axis=0)
-    return tpr, fnr, fpr, tnr, thresholds.tolist()
+    pos_sorted = np.sort(pos_arr)
+    neg_sorted = np.sort(neg_arr)
+    num_pos = float(pos_sorted.size)
+    num_neg = float(neg_sorted.size)
+    pos_lt = np.searchsorted(pos_sorted, thresholds, side="left")
+    neg_lt = np.searchsorted(neg_sorted, thresholds, side="left")
+    tpr = (pos_sorted.size - pos_lt) / num_pos
+    fpr = (neg_sorted.size - neg_lt) / num_neg
+    tnr = neg_lt / num_neg
+    fnr = pos_lt / num_pos
+    return tpr, fnr, fpr, tnr
 
 
 def _get_double_threshold_rates(
     pos_confs: np.ndarray,
     neg_confs: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[tuple[float, float]]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     pos_diff = float(np.max(pos_confs) - np.min(pos_confs))
     neg_diff = float(np.max(neg_confs) - np.min(neg_confs))
     smallest = neg_diff if pos_diff > neg_diff else pos_diff
@@ -155,55 +166,63 @@ def _get_double_threshold_rates(
         axis=0,
     )
     right_thresholds_tiled = np.repeat(right_thresholds, num_left_thresholds)
-    thresholds = list(zip(left_thresholds.tolist(), right_thresholds_tiled.tolist()))
-
-    pos_matrix = pos_arr[:, None]
-    neg_matrix = neg_arr[:, None]
-    left_matrix = left_thresholds[None, :]
-    right_matrix = right_thresholds_tiled[None, :]
-    pos_positive = np.logical_and(left_matrix <= pos_matrix, pos_matrix <= right_matrix).astype(np.float32)
-    neg_positive = np.logical_and(left_matrix <= neg_matrix, neg_matrix <= right_matrix).astype(np.float32)
-    tpr = np.mean(pos_positive, axis=0)
-    fnr = np.mean(1.0 - pos_positive, axis=0)
-    fpr = np.mean(neg_positive, axis=0)
-    tnr = np.mean(1.0 - neg_positive, axis=0)
-    return tpr, fnr, fpr, tnr, thresholds
+    pos_sorted = np.sort(pos_arr)
+    neg_sorted = np.sort(neg_arr)
+    pos_right = np.searchsorted(pos_sorted, right_thresholds_tiled, side="right")
+    pos_left = np.searchsorted(pos_sorted, left_thresholds, side="left")
+    neg_right = np.searchsorted(neg_sorted, right_thresholds_tiled, side="right")
+    neg_left = np.searchsorted(neg_sorted, left_thresholds, side="left")
+    pos_positive = np.maximum(pos_right - pos_left, 0)
+    neg_positive = np.maximum(neg_right - neg_left, 0)
+    num_pos = np.float32(pos_sorted.size)
+    num_neg = np.float32(neg_sorted.size)
+    tpr = pos_positive.astype(np.float32) / num_pos
+    fnr = (pos_sorted.size - pos_positive).astype(np.float32) / num_pos
+    fpr = neg_positive.astype(np.float32) / num_neg
+    tnr = (neg_sorted.size - neg_positive).astype(np.float32) / num_neg
+    return tpr, fnr, fpr, tnr
 
 
 def _compute_example_epsilon(fprs: np.ndarray, fnrs: np.ndarray, delta: float = DELTA) -> float:
     """Compute one example epsilon from FPR/FNR lists following Algorithm 1."""
 
-    per_attack_epsilons: list[float] = []
+    best_epsilon = float("nan")
     for fpr, fnr in zip(fprs, fnrs):
         if fpr <= 0.0 and fnr <= 0.0:
-            per_attack_epsilons.append(float("inf"))
-            continue
+            return float("inf")
         if fpr <= 0.0 or fnr <= 0.0 or (1 - delta - fpr) <= 0 or (1 - delta - fnr) <= 0:
             continue
-        
-        # epsilon_1
         first = math.log(1 - delta - fpr) - math.log(fnr)
-        
-        #epsilon_2
         second = math.log(1 - delta - fnr) - math.log(fpr)
-        
-        #epsilon^s = max(epsilon_1, epsilon_2)
-        per_attack_epsilons.append(float(np.nanmax([first, second])))
-
-    if not per_attack_epsilons:
-        return float("nan")
-    
-    return float(np.nanmax(per_attack_epsilons))
+        candidate = first if first >= second else second
+        if math.isnan(best_epsilon) or candidate > best_epsilon:
+            best_epsilon = candidate
+            if math.isinf(best_epsilon) or best_epsilon >= EPSILON_CAP:
+                return best_epsilon
+    return best_epsilon
 
 
-def _get_epsilons(pos_confs: np.ndarray, neg_confs: np.ndarray, delta: float = DELTA) -> list[float]:
+def _get_epsilons(
+    pos_confs: np.ndarray,
+    neg_confs: np.ndarray,
+    delta: float = DELTA,
+    show_progress: bool = False,
+    progress_desc: str | None = None,
+) -> list[float]:
     """Compute per-example epsilons using the released single and double attacks."""
 
     epsilons: list[float] = []
     num_examples = pos_confs.shape[1]
-    for index in range(num_examples):
-        pos_example = np.asarray(pos_confs[:, index], dtype=np.float64).reshape(-1)
-        neg_example = np.asarray(neg_confs[:, index], dtype=np.float64).reshape(-1)
+    example_indices: Any = range(num_examples)
+    if show_progress:
+        example_indices = tqdm(
+            example_indices,
+            desc=progress_desc or "Scoring Forget Examples",
+            leave=False,
+        )
+    for index in example_indices:
+        pos_example = np.asarray(pos_confs[:, index], dtype=np.float64)
+        neg_example = np.asarray(neg_confs[:, index], dtype=np.float64)
         pos_diff = float(np.max(pos_example) - np.min(pos_example))
         neg_diff = float(np.max(neg_example) - np.min(neg_example))
         largest = max(pos_diff, neg_diff)
@@ -212,12 +231,26 @@ def _get_epsilons(pos_confs: np.ndarray, neg_confs: np.ndarray, delta: float = D
             epsilons.append(EPSILON_CAP)
             continue
 
-        tpr_d, fnr_d, fpr_d, _tnr_d, _ = _get_double_threshold_rates(pos_example, neg_example)
-        tpr_s, fnr_s, fpr_s, _tnr_s, _ = _get_single_threshold_rates(pos_example, neg_example)
-        del tpr_d, tpr_s
-        fprs = np.concatenate([fpr_d, fpr_s], axis=0)
-        fnrs = np.concatenate([fnr_d, fnr_s], axis=0)
-        epsilon = _compute_example_epsilon(fprs=fprs, fnrs=fnrs, delta=delta)
+        tpr_s, fnr_s, fpr_s, _tnr_s = _get_single_threshold_rates(pos_example, neg_example)
+        del tpr_s
+        best_epsilon = _compute_example_epsilon(fprs=fpr_s, fnrs=fnr_s, delta=delta)
+        if math.isinf(best_epsilon) or best_epsilon >= EPSILON_CAP:
+            epsilons.append(EPSILON_CAP)
+            continue
+
+        tpr_d, fnr_d, fpr_d, _tnr_d = _get_double_threshold_rates(pos_example, neg_example)
+        del tpr_d
+        double_epsilon = _compute_example_epsilon(
+            fprs=fpr_d.astype(np.float64, copy=False),
+            fnrs=fnr_d.astype(np.float64, copy=False),
+            delta=delta,
+        )
+        if math.isnan(best_epsilon):
+            epsilon = double_epsilon
+        elif math.isnan(double_epsilon):
+            epsilon = best_epsilon
+        else:
+            epsilon = best_epsilon if best_epsilon >= double_epsilon else double_epsilon
         if math.isnan(epsilon):
             epsilon = 0.0
         epsilons.append(float(np.clip(epsilon, 0.0, EPSILON_CAP)))
@@ -252,6 +285,12 @@ def _score_epsilons(epsilons: list[float], num_models: int) -> float:
     return total_score / len(epsilons) if epsilons else 0.0
 
 
+def compute_forget_score_from_epsilons(epsilons: list[float], num_models: int) -> float:
+    """Return the released Kaggle forgetting-quality score from per-example epsilons."""
+
+    return _score_epsilons(epsilons, num_models=num_models)
+
+
 def compute_forget_score_from_confs(unlearned_confs: np.ndarray, retrained_confs: np.ndarray) -> float:
     """Return the released Kaggle forgetting-quality score from confidence banks."""
 
@@ -267,4 +306,4 @@ def compute_forget_score_from_confs(unlearned_confs: np.ndarray, retrained_confs
     pos_confs = np.where(retrain_is_positive, retrained_confs, unlearned_confs)
     neg_confs = np.where(retrain_is_positive, unlearned_confs, retrained_confs)
     epsilons = _get_epsilons(pos_confs, neg_confs, delta=DELTA)
-    return _score_epsilons(epsilons, num_models=unlearned_confs.shape[0])
+    return compute_forget_score_from_epsilons(epsilons, num_models=unlearned_confs.shape[0])

@@ -8,7 +8,11 @@ from typing import Any
 
 import numpy as np
 
-from tqdm.auto import tqdm
+try:
+    from tqdm.auto import tqdm
+except ImportError:  # pragma: no cover - depends on local environment.
+    def tqdm(iterable: Any, *args: Any, **kwargs: Any) -> Any:
+        return iterable
 
 try:
     import torch
@@ -20,7 +24,7 @@ try:
     from Code.metrics import (
         _get_epsilons,
         collect_logits_and_targets,
-        compute_forget_score_from_confs,
+        compute_forget_score_from_epsilons,
         compute_logit_scaled_confidence,
         compute_utility,
     )
@@ -30,7 +34,7 @@ except ImportError:  # pragma: no cover - allows direct module execution.
     from metrics import (
         _get_epsilons,
         collect_logits_and_targets,
-        compute_forget_score_from_confs,
+        compute_forget_score_from_epsilons,
         compute_logit_scaled_confidence,
         compute_utility,
     )
@@ -120,6 +124,7 @@ def summarize_bank_metrics(bank_metrics: dict[str, Any]) -> dict[str, Any]:
 
 def compare_candidate_to_reference(
     *,
+    candidate_name: str | None = None,
     candidate_bank: dict[str, Any],
     reference_bank: dict[str, Any],
     efficiency_ratio: float,
@@ -139,10 +144,19 @@ def compare_candidate_to_reference(
         candidate_bank["forget_confidences"],
         reference_bank["forget_confidences"],
     )
-    epsilons = _get_epsilons(pos_confs=pos_confs, neg_confs=neg_confs)
-    forgetting_quality = compute_forget_score_from_confs(
-        unlearned_confs=candidate_bank["forget_confidences"],
-        retrained_confs=reference_bank["forget_confidences"],
+    epsilons = _get_epsilons(
+        pos_confs=pos_confs,
+        neg_confs=neg_confs,
+        show_progress=True,
+        progress_desc=(
+            f"Scoring Forget Examples ({candidate_name})"
+            if candidate_name
+            else "Scoring Forget Examples"
+        ),
+    )
+    forgetting_quality = compute_forget_score_from_epsilons(
+        epsilons=epsilons,
+        num_models=candidate_bank["forget_confidences"].shape[0],
     )
     rar = float(np.mean(reference_bank["retain_accuracies"]))
     tar = float(np.mean(reference_bank["test_accuracies"]))
@@ -151,10 +165,13 @@ def compare_candidate_to_reference(
     retrain_runtime_mean = float(np.mean(reference_bank["runtime_seconds"]))
     candidate_runtime_mean = float(np.mean(candidate_bank["runtime_seconds"]))
     passed_efficiency_cutoff = candidate_runtime_mean <= (efficiency_ratio * retrain_runtime_mean)
+    raw_final_score = None
+    if rar > 0.0 and tar > 0.0:
+        # Ungated score for diagnostics and ablations.
+        raw_final_score = forgetting_quality * (rau / rar) * (tau / tar)
     final_score = None
-    if passed_efficiency_cutoff and rar > 0.0 and tar > 0.0:
-        # score = F * (rau / rar) * (tau / tar)
-        final_score = forgetting_quality * (rau / rar) * (tau / tar)
+    if passed_efficiency_cutoff:
+        final_score = raw_final_score
     return {
         "forgetting_quality": forgetting_quality,
         "per_example_epsilons": epsilons,
@@ -178,6 +195,7 @@ def compare_candidate_to_reference(
         },
         "efficiency_ratio_threshold": efficiency_ratio,
         "passed_efficiency_cutoff": passed_efficiency_cutoff,
+        "raw_final_score": raw_final_score,
         "final_score": final_score,
     }
 
@@ -222,10 +240,14 @@ def benchmark_model_families(
 
     comparisons: dict[str, dict[str, Any]] = {}
     reference_bank = bank_by_family[reference_family]
-    for family_name, bank in bank_by_family.items():
-        if family_name == reference_family:
-            continue
+    comparison_items = [
+        (family_name, bank)
+        for family_name, bank in bank_by_family.items()
+        if family_name != reference_family
+    ]
+    for family_name, bank in tqdm(comparison_items, desc="Scoring Candidate Families"):
         comparisons[family_name] = compare_candidate_to_reference(
+            candidate_name=family_name,
             candidate_bank=bank,
             reference_bank=reference_bank,
             efficiency_ratio=efficiency_ratio,
