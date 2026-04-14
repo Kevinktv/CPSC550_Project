@@ -23,6 +23,12 @@ except ImportError:  # pragma: no cover - depends on local environment.
     wandb = None
 
 try:
+    from tqdm.auto import tqdm
+except ImportError:  # pragma: no cover - depends on local environment.
+    def tqdm(iterable: Any, *args: Any, **kwargs: Any) -> Any:
+        return iterable
+
+try:
     import torch
 except ImportError:  # pragma: no cover - depends on local environment.
     torch = None
@@ -98,6 +104,56 @@ FANCHUAN_UNLEARNING_PROFILES: dict[str, dict[str, float | int]] = {
         "retain_weight_decay": 1e-2,
         "forget_weight_decay": 0.0,
         "uniform_weight_decay": 0.0,
+    },
+}
+
+SCRUB_UNLEARNING_PROFILES: dict[str, dict[str, Any]] = {
+    "cifar10": {
+        "forget_batch_size": 64,
+        "retain_batch_size": 32,
+        "epochs": 10,
+        "msteps": 3,
+        "optimizer": "adam",
+        "lr": 5e-4,
+        "weight_decay": 0.1,
+        "lr_decay_epochs": [5, 8, 9],
+        "lr_decay_rate": 0.1,
+        "alpha": 0.5,
+        "gamma": 1.0,
+        "kd_temperature": 2.0,
+    },
+    "mufac": {
+        "forget_batch_size": 16,
+        "retain_batch_size": 16,
+        "epochs": 10,
+        "msteps": 3,
+        "optimizer": "adam",
+        "lr": 2e-4,
+        "weight_decay": 0.05,
+        "lr_decay_epochs": [5, 8, 9],
+        "lr_decay_rate": 0.1,
+        "alpha": 0.5,
+        "gamma": 1.0,
+        "kd_temperature": 2.0,
+    },
+}
+
+DELETE_UNLEARNING_PROFILES: dict[str, dict[str, Any]] = {
+    "cifar10": {
+        "epochs": 8,
+        "lr": 1e-3,
+        "momentum": 0.9,
+        "batch_size": 64,
+        "soft_label": "inf",
+        "disable_bn": False,
+    },
+    "mufac": {
+        "epochs": 6,
+        "lr": 5e-4,
+        "momentum": 0.9,
+        "batch_size": 32,
+        "soft_label": "inf",
+        "disable_bn": False,
     },
 }
 
@@ -761,6 +817,46 @@ def _resolve_fanchuan_profile(dataset: str, profile: str | None) -> dict[str, fl
     return dict(FANCHUAN_UNLEARNING_PROFILES[profile_name])
 
 
+def _resolve_scrub_profile(dataset: str, profile: str | None) -> dict[str, Any]:
+    """Resolve a named SCRUB profile, defaulting to the dataset name."""
+
+    profile_name = dataset if profile is None else profile
+    if profile_name not in SCRUB_UNLEARNING_PROFILES:
+        raise ValueError(
+            f"Unsupported SCRUB profile '{profile_name}'. "
+            f"Available profiles: {sorted(SCRUB_UNLEARNING_PROFILES)}"
+        )
+    return deepcopy(SCRUB_UNLEARNING_PROFILES[profile_name])
+
+
+def _resolve_delete_profile(dataset: str, profile: str | None) -> dict[str, Any]:
+    """Resolve a named DELETE profile, defaulting to the dataset name."""
+
+    profile_name = dataset if profile is None else profile
+    if profile_name not in DELETE_UNLEARNING_PROFILES:
+        raise ValueError(
+            f"Unsupported DELETE profile '{profile_name}'. "
+            f"Available profiles: {sorted(DELETE_UNLEARNING_PROFILES)}"
+        )
+    return deepcopy(DELETE_UNLEARNING_PROFILES[profile_name])
+
+
+def _normalize_fanchuan_hyperparameters(profile_config: dict[str, float | int]) -> dict[str, float | int]:
+    """Normalize Fanchuan hyperparameters into a stable JSON-serializable shape."""
+
+    return {
+        "loader_batch_size": int(profile_config["loader_batch_size"]),
+        "retain_batch_size": int(profile_config["retain_batch_size"]),
+        "epochs": int(profile_config["epochs"]),
+        "uniform_stage_lr": float(profile_config["uniform_stage_lr"]),
+        "forget_stage_lr": float(profile_config["forget_stage_lr"]),
+        "retain_stage_lr": float(profile_config["retain_stage_lr"]),
+        "retain_weight_decay": float(profile_config["retain_weight_decay"]),
+        "forget_weight_decay": float(profile_config["forget_weight_decay"]),
+        "uniform_weight_decay": float(profile_config["uniform_weight_decay"]),
+    }
+
+
 def _fanchuan_uniform_kl_loss(logits: Any) -> Any:
     """Match model predictions to a uniform target distribution."""
 
@@ -784,6 +880,737 @@ def _build_shuffled_loader(dataset_obj: Any, *, batch_size: int) -> Any:
         shuffle=True,
         num_workers=0,
     )
+
+
+def _scrub_temperature_scaled_kl(student_logits: Any, teacher_logits: Any, *, temperature: float) -> Any:
+    """Compute the temperature-scaled teacher-to-student KL divergence."""
+
+    scaled_student = student_logits / float(temperature)
+    scaled_teacher = teacher_logits / float(temperature)
+    return torch.nn.functional.kl_div(
+        torch.nn.functional.log_softmax(scaled_student, dim=1),
+        torch.nn.functional.softmax(scaled_teacher, dim=1),
+        reduction="batchmean",
+    ) * (float(temperature) ** 2)
+
+
+def _build_scrub_optimizer(
+    model: Any,
+    *,
+    optimizer_name: str,
+    lr: float,
+    weight_decay: float,
+    momentum: float = 0.9,
+) -> Any:
+    """Build the optimizer for the native SCRUB workflow."""
+
+    resolved_name = optimizer_name.lower()
+    if resolved_name == "adam":
+        return torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    if resolved_name == "sgd":
+        return torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    if resolved_name in {"rmsp", "rmsprop"}:
+        return torch.optim.RMSprop(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    raise ValueError(f"Unsupported SCRUB optimizer '{optimizer_name}'.")
+
+
+def _apply_scrub_milestone_lr_decay(
+    optimizer: Any,
+    *,
+    base_lr: float,
+    epoch: int,
+    lr_decay_epochs: list[int],
+    lr_decay_rate: float,
+) -> float:
+    """Apply milestone-based learning-rate decay and return the current LR."""
+
+    decay_steps = sum(epoch > int(milestone) for milestone in lr_decay_epochs)
+    current_lr = float(base_lr) * (float(lr_decay_rate) ** decay_steps)
+    for param_group in optimizer.param_groups:
+        param_group["lr"] = current_lr
+    return current_lr
+
+
+def _run_scrub_phase(
+    *,
+    phase: str,
+    student_model: Any,
+    teacher_model: Any,
+    loader: Any,
+    optimizer: Any,
+    retain_criterion: Any,
+    device: Any,
+    temperature: float,
+    alpha: float,
+    gamma: float,
+) -> dict[str, float]:
+    """Run one SCRUB forget or retain phase and return average losses."""
+
+    if phase not in {"forget", "retain"}:
+        raise ValueError(f"Unsupported SCRUB phase '{phase}'.")
+    student_model.train()
+    teacher_model.eval()
+    kd_loss_sum = 0.0
+    ce_loss_sum = 0.0
+    objective_loss_sum = 0.0
+    sample_count = 0
+    progress = tqdm(
+        loader,
+        desc=f"SCRUB {phase}",
+        leave=False,
+    )
+    for inputs, targets in progress:
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+        optimizer.zero_grad()
+        with torch.no_grad():
+            teacher_logits = teacher_model(inputs)
+        student_logits = student_model(inputs)
+        kd_loss = _scrub_temperature_scaled_kl(
+            student_logits,
+            teacher_logits,
+            temperature=temperature,
+        )
+        if phase == "forget":
+            ce_loss_value = 0.0
+            objective_loss = -kd_loss
+        else:
+            ce_loss = retain_criterion(student_logits, targets)
+            ce_loss_value = float(ce_loss.item())
+            objective_loss = (float(alpha) * kd_loss) + (float(gamma) * ce_loss)
+        objective_loss.backward()
+        optimizer.step()
+        batch_size = targets.size(0)
+        kd_loss_sum += float(kd_loss.item()) * batch_size
+        ce_loss_sum += ce_loss_value * batch_size
+        objective_loss_sum += float(objective_loss.item()) * batch_size
+        sample_count += batch_size
+    if sample_count == 0:
+        return {
+            "mean_kd_loss": 0.0,
+            "mean_ce_loss": 0.0,
+            "mean_objective_loss": 0.0,
+        }
+    return {
+        "mean_kd_loss": kd_loss_sum / sample_count,
+        "mean_ce_loss": ce_loss_sum / sample_count,
+        "mean_objective_loss": objective_loss_sum / sample_count,
+    }
+
+
+def _normalize_scrub_hyperparameters(profile_config: dict[str, Any]) -> dict[str, Any]:
+    """Normalize SCRUB hyperparameters into a stable JSON-serializable shape."""
+
+    return {
+        "forget_batch_size": int(profile_config["forget_batch_size"]),
+        "retain_batch_size": int(profile_config["retain_batch_size"]),
+        "epochs": int(profile_config["epochs"]),
+        "msteps": int(profile_config["msteps"]),
+        "optimizer": str(profile_config["optimizer"]),
+        "lr": float(profile_config["lr"]),
+        "weight_decay": float(profile_config["weight_decay"]),
+        "lr_decay_epochs": [int(value) for value in profile_config["lr_decay_epochs"]],
+        "lr_decay_rate": float(profile_config["lr_decay_rate"]),
+        "alpha": float(profile_config["alpha"]),
+        "gamma": float(profile_config["gamma"]),
+        "kd_temperature": float(profile_config["kd_temperature"]),
+    }
+
+
+def _normalize_delete_hyperparameters(profile_config: dict[str, Any]) -> dict[str, Any]:
+    """Normalize DELETE hyperparameters into a stable JSON-serializable shape."""
+
+    return {
+        "epochs": int(profile_config["epochs"]),
+        "lr": float(profile_config["lr"]),
+        "momentum": float(profile_config["momentum"]),
+        "batch_size": int(profile_config["batch_size"]),
+        "soft_label": str(profile_config["soft_label"]),
+        "disable_bn": bool(profile_config["disable_bn"]),
+    }
+
+
+def _load_family_runtime_mean(family_dir: str | Path, *, num_models: int | None = None) -> float:
+    """Load the mean runtime from a checkpoint family sidecar bank."""
+
+    metadata_paths = sorted(Path(family_dir).glob("seed_*.json"))
+    if not metadata_paths:
+        raise FileNotFoundError(f"No checkpoint metadata found in {family_dir}")
+    if num_models is not None:
+        metadata_paths = metadata_paths[:num_models]
+    runtimes = [
+        float(json.loads(metadata_path.read_text(encoding="utf-8"))["runtime_seconds"])
+        for metadata_path in metadata_paths
+    ]
+    return float(np.mean(runtimes))
+
+
+def _build_fanchuan_efficiency_variants(
+    profile_name: str,
+    profile_config: dict[str, float | int],
+) -> list[tuple[str, dict[str, float | int]]]:
+    """Build a small quality-to-speed variant ladder for Fanchuan."""
+
+    base = _normalize_fanchuan_hyperparameters(profile_config)
+    epoch_candidates = [int(base["epochs"]), 4, 3, 2]
+    variants: list[tuple[str, dict[str, float | int]]] = []
+    seen_epochs: set[int] = set()
+    for epochs in epoch_candidates:
+        bounded_epochs = max(1, min(int(base["epochs"]), int(epochs)))
+        if bounded_epochs in seen_epochs:
+            continue
+        seen_epochs.add(bounded_epochs)
+        variant_name = profile_name if bounded_epochs == int(base["epochs"]) else f"{profile_name}_epochs_{bounded_epochs}"
+        variant_config = dict(base)
+        variant_config["epochs"] = bounded_epochs
+        variants.append((variant_name, variant_config))
+    return variants
+
+
+def _build_scrub_efficiency_variants(
+    profile_name: str,
+    profile_config: dict[str, Any],
+) -> list[tuple[str, dict[str, Any]]]:
+    """Build a small quality-to-speed variant ladder for SCRUB."""
+
+    base = _normalize_scrub_hyperparameters(profile_config)
+    epoch_candidates = [int(base["epochs"]), 8, 6, 4, 3, 2]
+    variants: list[tuple[str, dict[str, Any]]] = []
+    seen_epochs: set[int] = set()
+    for epochs in epoch_candidates:
+        bounded_epochs = max(2, min(int(base["epochs"]), int(epochs)))
+        if bounded_epochs in seen_epochs:
+            continue
+        seen_epochs.add(bounded_epochs)
+        variant_name = profile_name if bounded_epochs == int(base["epochs"]) else f"{profile_name}_epochs_{bounded_epochs}"
+        variant_config = dict(base)
+        variant_config["epochs"] = bounded_epochs
+        variant_config["msteps"] = min(int(base["msteps"]), bounded_epochs - 1)
+        variants.append((variant_name, variant_config))
+    return variants
+
+
+def _build_delete_efficiency_variants(
+    profile_name: str,
+    profile_config: dict[str, Any],
+) -> list[tuple[str, dict[str, Any]]]:
+    """Build a small quality-to-speed variant ladder for DELETE."""
+
+    base = _normalize_delete_hyperparameters(profile_config)
+    epoch_candidates = [int(base["epochs"]), 6, 4, 3, 2, 1]
+    variants: list[tuple[str, dict[str, Any]]] = []
+    seen_epochs: set[int] = set()
+    for epochs in epoch_candidates:
+        bounded_epochs = max(1, min(int(base["epochs"]), int(epochs)))
+        if bounded_epochs in seen_epochs:
+            continue
+        seen_epochs.add(bounded_epochs)
+        variant_name = profile_name if bounded_epochs == int(base["epochs"]) else f"{profile_name}_epochs_{bounded_epochs}"
+        variant_config = dict(base)
+        variant_config["epochs"] = bounded_epochs
+        variants.append((variant_name, variant_config))
+    return variants
+
+
+def _select_efficiency_variant(
+    *,
+    algorithm_name: str,
+    output_family_name: str,
+    candidate_variants: list[tuple[str, dict[str, Any]]],
+    reference_family_dir: str | Path,
+    efficiency_ratio: float,
+    trial_runner: Any,
+) -> dict[str, Any]:
+    """Pick the first quality-ordered variant that fits the runtime budget."""
+
+    reference_runtime_mean = _load_family_runtime_mean(reference_family_dir)
+    runtime_budget_seconds = float(efficiency_ratio) * float(reference_runtime_mean)
+    trials: list[dict[str, Any]] = []
+    selected_trial: dict[str, Any] | None = None
+    fastest_trial: dict[str, Any] | None = None
+    progress = tqdm(
+        candidate_variants,
+        desc=f"{algorithm_name} efficiency search ({output_family_name})",
+        leave=False,
+    )
+    for variant_name, variant_config in progress:
+        trial_metadata = trial_runner(variant_name, variant_config)
+        trial = {
+            "variant_name": variant_name,
+            "runtime_seconds": float(trial_metadata["runtime_seconds"]),
+            "best_val_accuracy": float(trial_metadata.get("best_val_accuracy", 0.0)),
+            "checkpoint_path": trial_metadata.get("checkpoint_path"),
+            "profile_config": variant_config,
+        }
+        trials.append(trial)
+        if fastest_trial is None or trial["runtime_seconds"] < fastest_trial["runtime_seconds"]:
+            fastest_trial = trial
+        if hasattr(progress, "set_postfix"):
+            progress.set_postfix(
+                {
+                    "variant": variant_name,
+                    "runtime": f"{trial['runtime_seconds']:.2f}s",
+                    "budget": f"{runtime_budget_seconds:.2f}s",
+                }
+            )
+        if trial["runtime_seconds"] <= runtime_budget_seconds:
+            selected_trial = trial
+            break
+    if selected_trial is None:
+        if fastest_trial is None:
+            raise ValueError(f"No efficiency-search trials produced for {algorithm_name}.")
+        selected_trial = fastest_trial
+    return {
+        "algorithm": algorithm_name,
+        "output_family_name": output_family_name,
+        "efficiency_ratio": float(efficiency_ratio),
+        "reference_runtime_mean": reference_runtime_mean,
+        "runtime_budget_seconds": runtime_budget_seconds,
+        "selected_variant": selected_trial["variant_name"],
+        "selected_runtime_seconds": selected_trial["runtime_seconds"],
+        "selected_best_val_accuracy": selected_trial["best_val_accuracy"],
+        "selected_profile_config": deepcopy(selected_trial["profile_config"]),
+        "passed_budget": selected_trial["runtime_seconds"] <= runtime_budget_seconds,
+        "trials": trials,
+    }
+
+
+def _delete_build_masked_teacher_probs(
+    teacher_logits: Any,
+    targets: Any,
+    *,
+    soft_label: str,
+) -> Any:
+    """Build DELETE soft targets from the teacher logits."""
+
+    if soft_label != "inf":
+        raise ValueError(f"Unsupported DELETE soft label method '{soft_label}'.")
+    masked_logits = teacher_logits.detach().clone()
+    masked_logits[torch.arange(targets.size(0), device=targets.device), targets] = -1e10
+    return torch.nn.functional.softmax(masked_logits, dim=1)
+
+
+def _run_delete_forget_epoch(
+    *,
+    student_model: Any,
+    teacher_model: Any,
+    loader: Any,
+    optimizer: Any,
+    criterion: Any,
+    device: Any,
+    soft_label: str,
+    disable_bn: bool,
+) -> float:
+    """Run one DELETE forget-only epoch and return mean KL loss."""
+
+    student_model.train()
+    teacher_model.eval()
+    loss_sum = 0.0
+    sample_count = 0
+    progress = tqdm(loader, desc="DELETE forget", leave=False)
+    for inputs, targets in progress:
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+        if disable_bn:
+            for module in student_model.modules():
+                if isinstance(module, torch.nn.BatchNorm2d):
+                    module.eval()
+        optimizer.zero_grad()
+        with torch.no_grad():
+            teacher_logits = teacher_model(inputs)
+        target_probs = _delete_build_masked_teacher_probs(
+            teacher_logits,
+            targets,
+            soft_label=soft_label,
+        )
+        student_log_probs = torch.nn.functional.log_softmax(student_model(inputs), dim=1)
+        loss = criterion(student_log_probs, target_probs)
+        loss.backward()
+        optimizer.step()
+        batch_size = targets.size(0)
+        loss_sum += float(loss.item()) * batch_size
+        sample_count += batch_size
+    return 0.0 if sample_count == 0 else loss_sum / sample_count
+
+
+def _run_scrub_unlearning_seed(
+    *,
+    dataset: str,
+    checkpoint_path: str | Path,
+    output_family_name: str,
+    profile_name: str,
+    profile_config: dict[str, Any],
+    data_bundle: Any,
+    checkpoint_dir: str | Path,
+    device_name: str,
+    image_size: int,
+    use_wandb: bool,
+    wandb_project: str | None,
+    class_weighting: str = "auto",
+    reuse_existing: bool = True,
+) -> dict[str, Any]:
+    """Run the native SCRUB method for one seed checkpoint."""
+
+    require_torch()
+    context = data_bundle.context
+    device = choose_device(device_name)
+    source_metadata = json.loads(Path(checkpoint_path).with_suffix(".json").read_text(encoding="utf-8"))
+    seed = int(source_metadata["seed"])
+    output_dir = Path(checkpoint_dir) / context.dataset / context.task_id / output_family_name
+    checkpoint_stem = f"seed_{seed}"
+    output_checkpoint_path = output_dir / f"{checkpoint_stem}.pth"
+    output_metadata_path = output_dir / f"{checkpoint_stem}.json"
+    algorithm_hyperparameters = _normalize_scrub_hyperparameters(profile_config)
+    if reuse_existing and output_checkpoint_path.exists() and output_metadata_path.exists():
+        existing_metadata = json.loads(output_metadata_path.read_text(encoding="utf-8"))
+        if (
+            existing_metadata.get("source_checkpoint") == str(checkpoint_path)
+            and existing_metadata.get("unlearning_algorithm") == "SCRUB"
+            and existing_metadata.get("algorithm_profile") == profile_name
+            and existing_metadata.get("algorithm_hyperparameters") == algorithm_hyperparameters
+            and existing_metadata.get("runtime_excludes_validation") is True
+        ):
+            reused_metadata = dict(existing_metadata)
+            reused_metadata["reused_existing"] = True
+            return reused_metadata
+
+    forget_batch_size = int(algorithm_hyperparameters["forget_batch_size"])
+    retain_batch_size = int(algorithm_hyperparameters["retain_batch_size"])
+    epochs = int(algorithm_hyperparameters["epochs"])
+    msteps = int(algorithm_hyperparameters["msteps"])
+    optimizer_name = str(algorithm_hyperparameters["optimizer"])
+    base_lr = float(algorithm_hyperparameters["lr"])
+    weight_decay = float(algorithm_hyperparameters["weight_decay"])
+    lr_decay_epochs = list(algorithm_hyperparameters["lr_decay_epochs"])
+    lr_decay_rate = float(algorithm_hyperparameters["lr_decay_rate"])
+    alpha = float(algorithm_hyperparameters["alpha"])
+    gamma = float(algorithm_hyperparameters["gamma"])
+    kd_temperature = float(algorithm_hyperparameters["kd_temperature"])
+    resolved_class_weighting = resolve_class_weighting(dataset, class_weighting)
+
+    set_random_seed(seed)
+    teacher_model = build_model(create_resnet18, num_classes=context.num_classes, dataset=dataset).to(device)
+    student_model = build_model(create_resnet18, num_classes=context.num_classes, dataset=dataset).to(device)
+    load_model_checkpoint(teacher_model, checkpoint_path, device)
+    load_model_checkpoint(student_model, checkpoint_path, device)
+    teacher_model.eval()
+    for parameter in teacher_model.parameters():
+        parameter.requires_grad_(False)
+
+    forget_loader = _build_shuffled_loader(data_bundle.loaders["forget"].dataset, batch_size=forget_batch_size)
+    retain_loader = _build_shuffled_loader(data_bundle.loaders["retain"].dataset, batch_size=retain_batch_size)
+    val_loader = data_bundle.loaders["val"]
+    class_counts = compute_split_class_counts(data_bundle, "retrain")
+    retain_criterion = build_loss(
+        class_counts,
+        context.num_classes,
+        device=device,
+        class_weighting=resolved_class_weighting,
+    )
+    optimizer = _build_scrub_optimizer(
+        student_model,
+        optimizer_name=optimizer_name,
+        lr=base_lr,
+        weight_decay=weight_decay,
+    )
+    wandb_run = init_wandb_run(
+        enabled=use_wandb,
+        entity="inmdev-university-of-british-columbia",
+        project=resolve_wandb_project(dataset, wandb_project),
+        run_name=f"{output_family_name}_seed_{seed}",
+        config={
+            "dataset": dataset,
+            "task_id": context.task_id,
+            "train_split": "retain",
+            "seed": seed,
+            "num_classes": context.num_classes,
+            "class_weighting": resolved_class_weighting,
+            "image_size": image_size,
+            "algorithm": "SCRUB",
+            "algorithm_profile": profile_name,
+            "algorithm_hyperparameters": algorithm_hyperparameters,
+            "source_checkpoint": str(checkpoint_path),
+            "output_family_name": output_family_name,
+        },
+    )
+
+    best_val_accuracy = 0.0
+    final_val_accuracy = 0.0
+    epoch_history: list[dict[str, Any]] = []
+    wall_clock_start = time.perf_counter()
+    training_runtime_seconds = 0.0
+
+    epoch_iterator = tqdm(
+        range(1, epochs + 1),
+        desc=f"SCRUB epochs ({output_family_name}, seed {seed})",
+        leave=False,
+    )
+    for epoch in epoch_iterator:
+        current_lr = _apply_scrub_milestone_lr_decay(
+            optimizer,
+            base_lr=base_lr,
+            epoch=epoch,
+            lr_decay_epochs=lr_decay_epochs,
+            lr_decay_rate=lr_decay_rate,
+        )
+        epoch_stage = "forget_then_retain" if epoch <= msteps else "retain_only"
+        forget_metrics = {
+            "mean_kd_loss": 0.0,
+            "mean_ce_loss": 0.0,
+            "mean_objective_loss": 0.0,
+        }
+        epoch_training_start = time.perf_counter()
+        if epoch <= msteps:
+            forget_metrics = _run_scrub_phase(
+                phase="forget",
+                student_model=student_model,
+                teacher_model=teacher_model,
+                loader=forget_loader,
+                optimizer=optimizer,
+                retain_criterion=retain_criterion,
+                device=device,
+                temperature=kd_temperature,
+                alpha=alpha,
+                gamma=gamma,
+            )
+        retain_metrics = _run_scrub_phase(
+            phase="retain",
+            student_model=student_model,
+            teacher_model=teacher_model,
+            loader=retain_loader,
+            optimizer=optimizer,
+            retain_criterion=retain_criterion,
+            device=device,
+            temperature=kd_temperature,
+            alpha=alpha,
+            gamma=gamma,
+        )
+        training_runtime_seconds += time.perf_counter() - epoch_training_start
+        val_accuracy = compute_accuracy(student_model, val_loader, device)
+        best_val_accuracy = max(best_val_accuracy, float(val_accuracy))
+        final_val_accuracy = float(val_accuracy)
+        epoch_metrics = {
+            "epoch": float(epoch),
+            "forget_loss": float(forget_metrics["mean_kd_loss"]),
+            "retain_kd_loss": float(retain_metrics["mean_kd_loss"]),
+            "retain_ce_loss": float(retain_metrics["mean_ce_loss"]),
+            "val_accuracy": float(val_accuracy),
+            "stage": epoch_stage,
+            "learning_rate": float(current_lr),
+        }
+        epoch_history.append(epoch_metrics)
+        wandb_run.log(epoch_metrics)
+        if hasattr(epoch_iterator, "set_postfix"):
+            epoch_iterator.set_postfix(
+                {
+                    "stage": epoch_stage,
+                    "forget": f"{epoch_metrics['forget_loss']:.4f}",
+                    "retain_ce": f"{epoch_metrics['retain_ce_loss']:.4f}",
+                    "val_acc": f"{epoch_metrics['val_accuracy']:.4f}",
+                }
+            )
+
+    wall_clock_seconds = time.perf_counter() - wall_clock_start
+    runtime_seconds = training_runtime_seconds
+    output_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(student_model.state_dict(), output_checkpoint_path)
+    output_metadata = {
+        "dataset": context.dataset,
+        "task_id": context.task_id,
+        "run_name": output_family_name,
+        "train_split": "retain",
+        "seed": seed,
+        "epochs": epochs,
+        "batch_size": forget_batch_size,
+        "learning_rate": base_lr,
+        "momentum": None,
+        "weight_decay": weight_decay,
+        "optimizer": optimizer_name,
+        "class_weighting": resolved_class_weighting,
+        "num_classes": context.num_classes,
+        "label_to_index": context.label_to_index,
+        "class_names": context.class_names,
+        "runtime_seconds": runtime_seconds,
+        "wall_clock_seconds": wall_clock_seconds,
+        "runtime_excludes_validation": True,
+        "best_val_accuracy": best_val_accuracy,
+        "final_val_accuracy": final_val_accuracy,
+        "checkpoint_path": str(output_checkpoint_path),
+        "epochs_logged": epoch_history,
+        "image_size": image_size,
+        "source_checkpoint": str(checkpoint_path),
+        "unlearning_algorithm": "SCRUB",
+        "algorithm_profile": profile_name,
+        "algorithm_hyperparameters": algorithm_hyperparameters,
+        "forget_batch_size": forget_batch_size,
+        "retain_batch_size": retain_batch_size,
+        "reused_existing": False,
+    }
+    output_metadata_path.write_text(json.dumps(output_metadata, indent=2), encoding="utf-8")
+    wandb_run.finish()
+    return output_metadata
+
+
+def _run_delete_unlearning_seed(
+    *,
+    dataset: str,
+    checkpoint_path: str | Path,
+    output_family_name: str,
+    profile_name: str,
+    profile_config: dict[str, Any],
+    data_bundle: Any,
+    checkpoint_dir: str | Path,
+    device_name: str,
+    image_size: int,
+    use_wandb: bool,
+    wandb_project: str | None,
+    reuse_existing: bool = True,
+) -> dict[str, Any]:
+    """Run the native DELETE method for one seed checkpoint."""
+
+    require_torch()
+    context = data_bundle.context
+    device = choose_device(device_name)
+    source_metadata = json.loads(Path(checkpoint_path).with_suffix(".json").read_text(encoding="utf-8"))
+    seed = int(source_metadata["seed"])
+    output_dir = Path(checkpoint_dir) / context.dataset / context.task_id / output_family_name
+    checkpoint_stem = f"seed_{seed}"
+    output_checkpoint_path = output_dir / f"{checkpoint_stem}.pth"
+    output_metadata_path = output_dir / f"{checkpoint_stem}.json"
+    algorithm_hyperparameters = _normalize_delete_hyperparameters(profile_config)
+    if reuse_existing and output_checkpoint_path.exists() and output_metadata_path.exists():
+        existing_metadata = json.loads(output_metadata_path.read_text(encoding="utf-8"))
+        if (
+            existing_metadata.get("source_checkpoint") == str(checkpoint_path)
+            and existing_metadata.get("unlearning_algorithm") == "DELETE"
+            and existing_metadata.get("algorithm_profile") == profile_name
+            and existing_metadata.get("algorithm_hyperparameters") == algorithm_hyperparameters
+            and existing_metadata.get("runtime_excludes_validation") is True
+        ):
+            reused_metadata = dict(existing_metadata)
+            reused_metadata["reused_existing"] = True
+            return reused_metadata
+
+    epochs = int(algorithm_hyperparameters["epochs"])
+    learning_rate = float(algorithm_hyperparameters["lr"])
+    momentum = float(algorithm_hyperparameters["momentum"])
+    batch_size = int(algorithm_hyperparameters["batch_size"])
+    soft_label = str(algorithm_hyperparameters["soft_label"])
+    disable_bn = bool(algorithm_hyperparameters["disable_bn"])
+
+    set_random_seed(seed)
+    teacher_model = build_model(create_resnet18, num_classes=context.num_classes, dataset=dataset).to(device)
+    student_model = build_model(create_resnet18, num_classes=context.num_classes, dataset=dataset).to(device)
+    load_model_checkpoint(teacher_model, checkpoint_path, device)
+    load_model_checkpoint(student_model, checkpoint_path, device)
+    teacher_model.eval()
+    for parameter in teacher_model.parameters():
+        parameter.requires_grad_(False)
+
+    forget_loader = _build_shuffled_loader(data_bundle.loaders["forget"].dataset, batch_size=batch_size)
+    val_loader = data_bundle.loaders["val"]
+    criterion = torch.nn.KLDivLoss(reduction="batchmean")
+    optimizer = torch.optim.SGD(student_model.parameters(), lr=learning_rate, momentum=momentum)
+    wandb_run = init_wandb_run(
+        enabled=use_wandb,
+        entity="inmdev-university-of-british-columbia",
+        project=resolve_wandb_project(dataset, wandb_project),
+        run_name=f"{output_family_name}_seed_{seed}",
+        config={
+            "dataset": dataset,
+            "task_id": context.task_id,
+            "train_split": "forget",
+            "seed": seed,
+            "num_classes": context.num_classes,
+            "image_size": image_size,
+            "algorithm": "DELETE",
+            "algorithm_profile": profile_name,
+            "algorithm_hyperparameters": algorithm_hyperparameters,
+            "source_checkpoint": str(checkpoint_path),
+            "output_family_name": output_family_name,
+        },
+    )
+
+    epoch_history: list[dict[str, Any]] = []
+    best_val_accuracy = 0.0
+    final_val_accuracy = 0.0
+    wall_clock_start = time.perf_counter()
+    training_runtime_seconds = 0.0
+    epoch_iterator = tqdm(
+        range(1, epochs + 1),
+        desc=f"DELETE epochs ({output_family_name}, seed {seed})",
+        leave=False,
+    )
+    for epoch in epoch_iterator:
+        epoch_training_start = time.perf_counter()
+        forget_loss = _run_delete_forget_epoch(
+            student_model=student_model,
+            teacher_model=teacher_model,
+            loader=forget_loader,
+            optimizer=optimizer,
+            criterion=criterion,
+            device=device,
+            soft_label=soft_label,
+            disable_bn=disable_bn,
+        )
+        training_runtime_seconds += time.perf_counter() - epoch_training_start
+        val_accuracy = compute_accuracy(student_model, val_loader, device)
+        best_val_accuracy = max(best_val_accuracy, float(val_accuracy))
+        final_val_accuracy = float(val_accuracy)
+        epoch_metrics = {
+            "epoch": float(epoch),
+            "forget_loss": float(forget_loss),
+            "val_accuracy": float(val_accuracy),
+            "stage": "forget_only",
+            "learning_rate": learning_rate,
+        }
+        epoch_history.append(epoch_metrics)
+        wandb_run.log(epoch_metrics)
+        if hasattr(epoch_iterator, "set_postfix"):
+            epoch_iterator.set_postfix(
+                {
+                    "forget": f"{forget_loss:.4f}",
+                    "val_acc": f"{float(val_accuracy):.4f}",
+                }
+            )
+
+    wall_clock_seconds = time.perf_counter() - wall_clock_start
+    runtime_seconds = training_runtime_seconds
+    output_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(student_model.state_dict(), output_checkpoint_path)
+    output_metadata = {
+        "dataset": context.dataset,
+        "task_id": context.task_id,
+        "run_name": output_family_name,
+        "train_split": "forget",
+        "seed": seed,
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "momentum": momentum,
+        "weight_decay": 0.0,
+        "num_classes": context.num_classes,
+        "label_to_index": context.label_to_index,
+        "class_names": context.class_names,
+        "runtime_seconds": runtime_seconds,
+        "wall_clock_seconds": wall_clock_seconds,
+        "runtime_excludes_validation": True,
+        "best_val_accuracy": best_val_accuracy,
+        "final_val_accuracy": final_val_accuracy,
+        "checkpoint_path": str(output_checkpoint_path),
+        "epochs_logged": epoch_history,
+        "image_size": image_size,
+        "source_checkpoint": str(checkpoint_path),
+        "unlearning_algorithm": "DELETE",
+        "algorithm_profile": profile_name,
+        "algorithm_hyperparameters": algorithm_hyperparameters,
+        "soft_label": soft_label,
+        "disable_bn": disable_bn,
+        "reused_existing": False,
+    }
+    output_metadata_path.write_text(json.dumps(output_metadata, indent=2), encoding="utf-8")
+    wandb_run.finish()
+    return output_metadata
 
 
 def _run_fanchuan_unlearning_seed(
@@ -813,12 +1640,14 @@ def _run_fanchuan_unlearning_seed(
     checkpoint_stem = f"seed_{seed}"
     output_checkpoint_path = output_dir / f"{checkpoint_stem}.pth"
     output_metadata_path = output_dir / f"{checkpoint_stem}.json"
+    algorithm_hyperparameters = _normalize_fanchuan_hyperparameters(profile_config)
     if reuse_existing and output_checkpoint_path.exists() and output_metadata_path.exists():
         existing_metadata = json.loads(output_metadata_path.read_text(encoding="utf-8"))
         if (
             existing_metadata.get("source_checkpoint") == str(checkpoint_path)
             and existing_metadata.get("unlearning_algorithm") == "FanchuanUnlearning"
             and existing_metadata.get("algorithm_profile") == profile_name
+            and existing_metadata.get("algorithm_hyperparameters") == algorithm_hyperparameters
             and existing_metadata.get("runtime_excludes_validation") is True
         ):
             reused_metadata = dict(existing_metadata)
@@ -886,6 +1715,7 @@ def _run_fanchuan_unlearning_seed(
             "image_size": image_size,
             "algorithm": "FanchuanUnlearning",
             "algorithm_profile": profile_name,
+            "algorithm_hyperparameters": algorithm_hyperparameters,
             "loader_batch_size": loader_batch_size,
             "retain_batch_size": retain_batch_size,
             "epochs": epochs,
@@ -1019,6 +1849,7 @@ def _run_fanchuan_unlearning_seed(
         "source_checkpoint": str(checkpoint_path),
         "unlearning_algorithm": "FanchuanUnlearning",
         "algorithm_profile": profile_name,
+        "algorithm_hyperparameters": algorithm_hyperparameters,
         "algorithm_temperature": temperature,
         "loader_batch_size": loader_batch_size,
         "retain_batch_size": retain_batch_size,
@@ -1056,6 +1887,9 @@ def run_fanchuan_unlearning_workflow(
     class_weighting: str = "auto",
     image_size: int | None = None,
     reuse_existing: bool = True,
+    efficiency_aware: bool = False,
+    reference_family_dir: str | Path | None = None,
+    efficiency_ratio: float = 0.2,
 ) -> dict[str, Any]:
     """Run the ported FanchuanUnlearning two-stage method over a checkpoint bank."""
 
@@ -1067,12 +1901,53 @@ def run_fanchuan_unlearning_workflow(
     if not base_checkpoints:
         raise FileNotFoundError(f"No base checkpoints found in {base_family_dir}")
 
+    selection_summary: dict[str, Any] | None = None
+    selected_profile_name = profile_name
+    selected_profile_config = _normalize_fanchuan_hyperparameters(profile_config)
+    if efficiency_aware:
+        if reference_family_dir is None:
+            raise ValueError("`reference_family_dir` is required when `efficiency_aware=True`.")
+        candidate_variants = _build_fanchuan_efficiency_variants(profile_name, profile_config)
+        selected_summary = _select_efficiency_variant(
+            algorithm_name="FanchuanUnlearning",
+            output_family_name=output_family_name,
+            candidate_variants=candidate_variants,
+            reference_family_dir=reference_family_dir,
+            efficiency_ratio=efficiency_ratio,
+            trial_runner=lambda variant_name, variant_config: _run_fanchuan_unlearning_seed(
+                dataset=dataset,
+                checkpoint_path=base_checkpoints[0],
+                output_family_name=f"{output_family_name}__selection__{variant_name}",
+                profile_name=variant_name,
+                profile_config=variant_config,
+                data_bundle=create_dataloaders_from_manifest(
+                    dataset=dataset,
+                    task_manifest=task_manifest,
+                    samples_csv=samples_csv,
+                    data_root=data_root,
+                    batch_size=int(variant_config["loader_batch_size"]),
+                    num_workers=0,
+                    image_size=image_size,
+                ),
+                checkpoint_dir=checkpoint_dir,
+                device_name=device_name,
+                image_size=image_size,
+                use_wandb=False,
+                wandb_project=None,
+                class_weighting=class_weighting,
+                reuse_existing=True,
+            ),
+        )
+        selection_summary = selected_summary
+        selected_profile_name = str(selected_summary["selected_variant"])
+        selected_profile_config = dict(selected_summary["selected_profile_config"])
+
     data_bundle = create_dataloaders_from_manifest(
         dataset=dataset,
         task_manifest=task_manifest,
         samples_csv=samples_csv,
         data_root=data_root,
-        batch_size=int(profile_config["loader_batch_size"]),
+        batch_size=int(selected_profile_config["loader_batch_size"]),
         num_workers=0,
         image_size=image_size,
     )
@@ -1084,8 +1959,8 @@ def run_fanchuan_unlearning_workflow(
                 dataset=dataset,
                 checkpoint_path=checkpoint_path,
                 output_family_name=output_family_name,
-                profile_name=profile_name,
-                profile_config=profile_config,
+                profile_name=selected_profile_name,
+                profile_config=selected_profile_config,
                 data_bundle=data_bundle,
                 checkpoint_dir=checkpoint_dir,
                 device_name=device_name,
@@ -1101,10 +1976,244 @@ def run_fanchuan_unlearning_workflow(
         "family_name": output_family_name,
         "seed_bank": outputs,
         "family_dir": str(Path(checkpoint_dir) / dataset / data_bundle.context.task_id / output_family_name),
+        "efficiency_selection": selection_summary,
     }
 
 
 run_second_place_unlearning_workflow = run_fanchuan_unlearning_workflow
+
+
+def run_scrub_unlearning_workflow(
+    *,
+    dataset: str,
+    base_family_dir: str | Path,
+    output_family_name: str = "SCRUB",
+    num_bank_seeds: int = 3,
+    profile: str | None = None,
+    checkpoint_dir: str | Path = "checkpoints",
+    data_root: str | Path | None = None,
+    task_manifest: str | Path | None = None,
+    samples_csv: str | Path | None = None,
+    device_name: str = "auto",
+    use_wandb: bool = False,
+    wandb_project: str | None = None,
+    class_weighting: str = "auto",
+    image_size: int | None = None,
+    reuse_existing: bool = True,
+    efficiency_aware: bool = False,
+    reference_family_dir: str | Path | None = None,
+    efficiency_ratio: float = 0.2,
+) -> dict[str, Any]:
+    """Run the native SCRUB method over a checkpoint bank."""
+
+    require_torch()
+    profile_name = dataset if profile is None else profile
+    profile_config = _resolve_scrub_profile(dataset, profile_name)
+    image_size = resolve_image_size(dataset, image_size)
+    base_checkpoints = sorted(Path(base_family_dir).glob("seed_*.pth"))[:num_bank_seeds]
+    if not base_checkpoints:
+        raise FileNotFoundError(f"No base checkpoints found in {base_family_dir}")
+
+    selection_summary: dict[str, Any] | None = None
+    selected_profile_name = profile_name
+    selected_profile_config = _normalize_scrub_hyperparameters(profile_config)
+    if efficiency_aware:
+        if reference_family_dir is None:
+            raise ValueError("`reference_family_dir` is required when `efficiency_aware=True`.")
+        candidate_variants = _build_scrub_efficiency_variants(profile_name, profile_config)
+        selected_summary = _select_efficiency_variant(
+            algorithm_name="SCRUB",
+            output_family_name=output_family_name,
+            candidate_variants=candidate_variants,
+            reference_family_dir=reference_family_dir,
+            efficiency_ratio=efficiency_ratio,
+            trial_runner=lambda variant_name, variant_config: _run_scrub_unlearning_seed(
+                dataset=dataset,
+                checkpoint_path=base_checkpoints[0],
+                output_family_name=f"{output_family_name}__selection__{variant_name}",
+                profile_name=variant_name,
+                profile_config=variant_config,
+                data_bundle=create_dataloaders_from_manifest(
+                    dataset=dataset,
+                    task_manifest=task_manifest,
+                    samples_csv=samples_csv,
+                    data_root=data_root,
+                    batch_size=max(
+                        int(variant_config["forget_batch_size"]),
+                        int(variant_config["retain_batch_size"]),
+                    ),
+                    num_workers=0,
+                    image_size=image_size,
+                ),
+                checkpoint_dir=checkpoint_dir,
+                device_name=device_name,
+                image_size=image_size,
+                use_wandb=False,
+                wandb_project=None,
+                class_weighting=class_weighting,
+                reuse_existing=True,
+            ),
+        )
+        selection_summary = selected_summary
+        selected_profile_name = str(selected_summary["selected_variant"])
+        selected_profile_config = dict(selected_summary["selected_profile_config"])
+
+    data_bundle = create_dataloaders_from_manifest(
+        dataset=dataset,
+        task_manifest=task_manifest,
+        samples_csv=samples_csv,
+        data_root=data_root,
+        batch_size=max(
+            int(selected_profile_config["forget_batch_size"]),
+            int(selected_profile_config["retain_batch_size"]),
+        ),
+        num_workers=0,
+        image_size=image_size,
+    )
+
+    outputs: list[dict[str, Any]] = []
+    checkpoint_iterator = tqdm(
+        base_checkpoints,
+        desc=f"SCRUB seed bank ({output_family_name})",
+        leave=False,
+    )
+    for checkpoint_path in checkpoint_iterator:
+        outputs.append(
+            _run_scrub_unlearning_seed(
+                dataset=dataset,
+                checkpoint_path=checkpoint_path,
+                output_family_name=output_family_name,
+                profile_name=selected_profile_name,
+                profile_config=selected_profile_config,
+                data_bundle=data_bundle,
+                checkpoint_dir=checkpoint_dir,
+                device_name=device_name,
+                image_size=image_size,
+                use_wandb=use_wandb,
+                wandb_project=wandb_project,
+                class_weighting=class_weighting,
+                reuse_existing=reuse_existing,
+            )
+        )
+
+    return {
+        "family_name": output_family_name,
+        "seed_bank": outputs,
+        "family_dir": str(Path(checkpoint_dir) / dataset / data_bundle.context.task_id / output_family_name),
+        "efficiency_selection": selection_summary,
+    }
+
+
+def run_delete_unlearning_workflow(
+    *,
+    dataset: str,
+    base_family_dir: str | Path,
+    output_family_name: str = "DELETE",
+    num_bank_seeds: int = 3,
+    profile: str | None = None,
+    checkpoint_dir: str | Path = "checkpoints",
+    data_root: str | Path | None = None,
+    task_manifest: str | Path | None = None,
+    samples_csv: str | Path | None = None,
+    device_name: str = "auto",
+    use_wandb: bool = False,
+    wandb_project: str | None = None,
+    image_size: int | None = None,
+    reuse_existing: bool = True,
+    efficiency_aware: bool = False,
+    reference_family_dir: str | Path | None = None,
+    efficiency_ratio: float = 0.2,
+) -> dict[str, Any]:
+    """Run the native DELETE method over a checkpoint bank."""
+
+    require_torch()
+    profile_name = dataset if profile is None else profile
+    profile_config = _resolve_delete_profile(dataset, profile_name)
+    image_size = resolve_image_size(dataset, image_size)
+    base_checkpoints = sorted(Path(base_family_dir).glob("seed_*.pth"))[:num_bank_seeds]
+    if not base_checkpoints:
+        raise FileNotFoundError(f"No base checkpoints found in {base_family_dir}")
+
+    selection_summary: dict[str, Any] | None = None
+    selected_profile_name = profile_name
+    selected_profile_config = _normalize_delete_hyperparameters(profile_config)
+    if efficiency_aware:
+        if reference_family_dir is None:
+            raise ValueError("`reference_family_dir` is required when `efficiency_aware=True`.")
+        candidate_variants = _build_delete_efficiency_variants(profile_name, profile_config)
+        selected_summary = _select_efficiency_variant(
+            algorithm_name="DELETE",
+            output_family_name=output_family_name,
+            candidate_variants=candidate_variants,
+            reference_family_dir=reference_family_dir,
+            efficiency_ratio=efficiency_ratio,
+            trial_runner=lambda variant_name, variant_config: _run_delete_unlearning_seed(
+                dataset=dataset,
+                checkpoint_path=base_checkpoints[0],
+                output_family_name=f"{output_family_name}__selection__{variant_name}",
+                profile_name=variant_name,
+                profile_config=variant_config,
+                data_bundle=create_dataloaders_from_manifest(
+                    dataset=dataset,
+                    task_manifest=task_manifest,
+                    samples_csv=samples_csv,
+                    data_root=data_root,
+                    batch_size=int(variant_config["batch_size"]),
+                    num_workers=0,
+                    image_size=image_size,
+                ),
+                checkpoint_dir=checkpoint_dir,
+                device_name=device_name,
+                image_size=image_size,
+                use_wandb=False,
+                wandb_project=None,
+                reuse_existing=True,
+            ),
+        )
+        selection_summary = selected_summary
+        selected_profile_name = str(selected_summary["selected_variant"])
+        selected_profile_config = dict(selected_summary["selected_profile_config"])
+
+    data_bundle = create_dataloaders_from_manifest(
+        dataset=dataset,
+        task_manifest=task_manifest,
+        samples_csv=samples_csv,
+        data_root=data_root,
+        batch_size=int(selected_profile_config["batch_size"]),
+        num_workers=0,
+        image_size=image_size,
+    )
+
+    outputs: list[dict[str, Any]] = []
+    checkpoint_iterator = tqdm(
+        base_checkpoints,
+        desc=f"DELETE seed bank ({output_family_name})",
+        leave=False,
+    )
+    for checkpoint_path in checkpoint_iterator:
+        outputs.append(
+            _run_delete_unlearning_seed(
+                dataset=dataset,
+                checkpoint_path=checkpoint_path,
+                output_family_name=output_family_name,
+                profile_name=selected_profile_name,
+                profile_config=selected_profile_config,
+                data_bundle=data_bundle,
+                checkpoint_dir=checkpoint_dir,
+                device_name=device_name,
+                image_size=image_size,
+                use_wandb=use_wandb,
+                wandb_project=wandb_project,
+                reuse_existing=reuse_existing,
+            )
+        )
+
+    return {
+        "family_name": output_family_name,
+        "seed_bank": outputs,
+        "family_dir": str(Path(checkpoint_dir) / dataset / data_bundle.context.task_id / output_family_name),
+        "efficiency_selection": selection_summary,
+    }
 
 
 def run_retain_finetune_placeholder(
