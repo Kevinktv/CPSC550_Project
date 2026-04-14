@@ -70,28 +70,40 @@ except ImportError:  # pragma: no cover - allows direct module execution.
 
 try:
     from Code.unlearning_algorithms import (
+        CT_UNLEARNING_PROFILES as _PACKAGE_CT_UNLEARNING_PROFILES,
         DELETE_UNLEARNING_PROFILES as _PACKAGE_DELETE_UNLEARNING_PROFILES,
         FANCHUAN_UNLEARNING_PROFILES as _PACKAGE_FANCHUAN_UNLEARNING_PROFILES,
+        MSG_UNLEARNING_PROFILES as _PACKAGE_MSG_UNLEARNING_PROFILES,
         SCRUB_UNLEARNING_PROFILES as _PACKAGE_SCRUB_UNLEARNING_PROFILES,
+        _build_ct_efficiency_variants as _package_build_ct_efficiency_variants,
         _build_delete_efficiency_variants as _package_build_delete_efficiency_variants,
         _build_fanchuan_efficiency_variants as _package_build_fanchuan_efficiency_variants,
+        _build_msg_efficiency_variants as _package_build_msg_efficiency_variants,
         _build_scrub_efficiency_variants as _package_build_scrub_efficiency_variants,
         _select_efficiency_variant as _package_select_efficiency_variant,
+        run_ct_unlearning_workflow as _package_run_ct_unlearning_workflow,
         run_delete_unlearning_workflow as _package_run_delete_unlearning_workflow,
         run_fanchuan_unlearning_workflow as _package_run_fanchuan_unlearning_workflow,
+        run_msg_unlearning_workflow as _package_run_msg_unlearning_workflow,
         run_scrub_unlearning_workflow as _package_run_scrub_unlearning_workflow,
     )
 except ImportError:  # pragma: no cover - allows direct module execution.
     from unlearning_algorithms import (
+        CT_UNLEARNING_PROFILES as _PACKAGE_CT_UNLEARNING_PROFILES,
         DELETE_UNLEARNING_PROFILES as _PACKAGE_DELETE_UNLEARNING_PROFILES,
         FANCHUAN_UNLEARNING_PROFILES as _PACKAGE_FANCHUAN_UNLEARNING_PROFILES,
+        MSG_UNLEARNING_PROFILES as _PACKAGE_MSG_UNLEARNING_PROFILES,
         SCRUB_UNLEARNING_PROFILES as _PACKAGE_SCRUB_UNLEARNING_PROFILES,
+        _build_ct_efficiency_variants as _package_build_ct_efficiency_variants,
         _build_delete_efficiency_variants as _package_build_delete_efficiency_variants,
         _build_fanchuan_efficiency_variants as _package_build_fanchuan_efficiency_variants,
+        _build_msg_efficiency_variants as _package_build_msg_efficiency_variants,
         _build_scrub_efficiency_variants as _package_build_scrub_efficiency_variants,
         _select_efficiency_variant as _package_select_efficiency_variant,
+        run_ct_unlearning_workflow as _package_run_ct_unlearning_workflow,
         run_delete_unlearning_workflow as _package_run_delete_unlearning_workflow,
         run_fanchuan_unlearning_workflow as _package_run_fanchuan_unlearning_workflow,
+        run_msg_unlearning_workflow as _package_run_msg_unlearning_workflow,
         run_scrub_unlearning_workflow as _package_run_scrub_unlearning_workflow,
     )
 
@@ -781,12 +793,16 @@ def _build_unlearning_runtime_deps() -> dict[str, Any]:
 # The unlearning source of truth now lives in Code/unlearning_algorithms/.
 # These re-exports keep the notebook and tests stable while the implementation
 # stays split into per-algorithm modules plus shared workflow helpers.
+CT_UNLEARNING_PROFILES = _PACKAGE_CT_UNLEARNING_PROFILES
 FANCHUAN_UNLEARNING_PROFILES = _PACKAGE_FANCHUAN_UNLEARNING_PROFILES
 SCRUB_UNLEARNING_PROFILES = _PACKAGE_SCRUB_UNLEARNING_PROFILES
 DELETE_UNLEARNING_PROFILES = _PACKAGE_DELETE_UNLEARNING_PROFILES
+MSG_UNLEARNING_PROFILES = _PACKAGE_MSG_UNLEARNING_PROFILES
+_build_ct_efficiency_variants = _package_build_ct_efficiency_variants
 _build_fanchuan_efficiency_variants = _package_build_fanchuan_efficiency_variants
 _build_scrub_efficiency_variants = _package_build_scrub_efficiency_variants
 _build_delete_efficiency_variants = _package_build_delete_efficiency_variants
+_build_msg_efficiency_variants = _package_build_msg_efficiency_variants
 _select_efficiency_variant = _package_select_efficiency_variant
 
 
@@ -839,6 +855,50 @@ def run_fanchuan_unlearning_workflow(
 run_second_place_unlearning_workflow = run_fanchuan_unlearning_workflow
 
 
+def run_msg_unlearning_workflow(
+    *,
+    dataset: str,
+    base_family_dir: str | Path,
+    output_family_name: str = "MSG",
+    num_bank_seeds: int = 3,
+    profile: str | None = None,
+    checkpoint_dir: str | Path = "checkpoints",
+    data_root: str | Path | None = None,
+    task_manifest: str | Path | None = None,
+    samples_csv: str | Path | None = None,
+    device_name: str = "auto",
+    use_wandb: bool = False,
+    wandb_project: str | None = None,
+    image_size: int | None = None,
+    reuse_existing: bool = True,
+    efficiency_aware: bool = False,
+    reference_family_dir: str | Path | None = None,
+    efficiency_ratio: float = 0.2,
+) -> dict[str, Any]:
+    """Compatibility wrapper around the modular MSG workflow."""
+
+    return _package_run_msg_unlearning_workflow(
+        deps=_build_unlearning_runtime_deps(),
+        dataset=dataset,
+        base_family_dir=base_family_dir,
+        output_family_name=output_family_name,
+        num_bank_seeds=num_bank_seeds,
+        profile=profile,
+        checkpoint_dir=checkpoint_dir,
+        data_root=data_root,
+        task_manifest=task_manifest,
+        samples_csv=samples_csv,
+        device_name=device_name,
+        use_wandb=use_wandb,
+        wandb_project=wandb_project,
+        image_size=image_size,
+        reuse_existing=reuse_existing,
+        efficiency_aware=efficiency_aware,
+        reference_family_dir=reference_family_dir,
+        efficiency_ratio=efficiency_ratio,
+    )
+
+
 def run_scrub_unlearning_workflow(
     *,
     dataset: str,
@@ -877,6 +937,50 @@ def run_scrub_unlearning_workflow(
         use_wandb=use_wandb,
         wandb_project=wandb_project,
         class_weighting=class_weighting,
+        image_size=image_size,
+        reuse_existing=reuse_existing,
+        efficiency_aware=efficiency_aware,
+        reference_family_dir=reference_family_dir,
+        efficiency_ratio=efficiency_ratio,
+    )
+
+
+def run_ct_unlearning_workflow(
+    *,
+    dataset: str,
+    base_family_dir: str | Path,
+    output_family_name: str = "CT",
+    num_bank_seeds: int = 3,
+    profile: str | None = None,
+    checkpoint_dir: str | Path = "checkpoints",
+    data_root: str | Path | None = None,
+    task_manifest: str | Path | None = None,
+    samples_csv: str | Path | None = None,
+    device_name: str = "auto",
+    use_wandb: bool = False,
+    wandb_project: str | None = None,
+    image_size: int | None = None,
+    reuse_existing: bool = True,
+    efficiency_aware: bool = False,
+    reference_family_dir: str | Path | None = None,
+    efficiency_ratio: float = 0.2,
+) -> dict[str, Any]:
+    """Compatibility wrapper around the modular CT workflow."""
+
+    return _package_run_ct_unlearning_workflow(
+        deps=_build_unlearning_runtime_deps(),
+        dataset=dataset,
+        base_family_dir=base_family_dir,
+        output_family_name=output_family_name,
+        num_bank_seeds=num_bank_seeds,
+        profile=profile,
+        checkpoint_dir=checkpoint_dir,
+        data_root=data_root,
+        task_manifest=task_manifest,
+        samples_csv=samples_csv,
+        device_name=device_name,
+        use_wandb=use_wandb,
+        wandb_project=wandb_project,
         image_size=image_size,
         reuse_existing=reuse_existing,
         efficiency_aware=efficiency_aware,

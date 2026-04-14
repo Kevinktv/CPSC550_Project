@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 try:
@@ -34,6 +35,19 @@ def _tiny_model_factory(num_classes: int, dataset: str | None = None) -> torch.n
     return torch.nn.Sequential(
         torch.nn.Flatten(),
         torch.nn.Linear(3 * 4 * 4, num_classes),
+    )
+
+
+def _tiny_conv_model_factory(num_classes: int, dataset: str | None = None) -> torch.nn.Module:
+    del dataset
+    return torch.nn.Sequential(
+        torch.nn.Conv2d(3, 4, kernel_size=3, padding=1),
+        torch.nn.ReLU(),
+        torch.nn.Conv2d(4, 4, kernel_size=3, padding=1),
+        torch.nn.ReLU(),
+        torch.nn.AdaptiveAvgPool2d((1, 1)),
+        torch.nn.Flatten(),
+        torch.nn.Linear(4, num_classes),
     )
 
 
@@ -111,6 +125,76 @@ class EfficiencySelectionTests(unittest.TestCase):
                 trial_runner=lambda variant_name, _variant_config: dict(trial_results[variant_name]),
             )
             self.assertEqual(selected["selected_variant"], "cifar10_epochs_4")
+            self.assertTrue(selected["passed_budget"])
+
+    def test_msg_efficiency_variants_and_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            reference_dir = root / "baseline_retrain"
+            reference_dir.mkdir(parents=True, exist_ok=True)
+            for seed, runtime in enumerate([12.0, 12.0, 12.0]):
+                (reference_dir / f"seed_{seed}.json").write_text(
+                    json.dumps({"runtime_seconds": runtime}),
+                    encoding="utf-8",
+                )
+            variants = notebook_workflows._build_msg_efficiency_variants(
+                "cifar10",
+                notebook_workflows.MSG_UNLEARNING_PROFILES["cifar10"],
+            )
+            self.assertEqual(
+                [variant_name for variant_name, _ in variants],
+                ["cifar10", "cifar10_epochs_4", "cifar10_epochs_3", "cifar10_epochs_2", "cifar10_epochs_1"],
+            )
+            trial_results = {
+                "cifar10": {"runtime_seconds": 4.0, "best_val_accuracy": 0.88},
+                "cifar10_epochs_4": {"runtime_seconds": 3.1, "best_val_accuracy": 0.86},
+                "cifar10_epochs_3": {"runtime_seconds": 2.1, "best_val_accuracy": 0.84},
+                "cifar10_epochs_2": {"runtime_seconds": 1.6, "best_val_accuracy": 0.8},
+                "cifar10_epochs_1": {"runtime_seconds": 1.0, "best_val_accuracy": 0.77},
+            }
+            selected = notebook_workflows._select_efficiency_variant(
+                algorithm_name="MSG",
+                output_family_name="MSG",
+                candidate_variants=variants,
+                reference_family_dir=reference_dir,
+                efficiency_ratio=0.2,
+                trial_runner=lambda variant_name, _variant_config: dict(trial_results[variant_name]),
+            )
+            self.assertEqual(selected["selected_variant"], "cifar10_epochs_3")
+            self.assertTrue(selected["passed_budget"])
+
+    def test_ct_efficiency_variants_and_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            reference_dir = root / "baseline_retrain"
+            reference_dir.mkdir(parents=True, exist_ok=True)
+            for seed, runtime in enumerate([8.0, 8.0, 8.0]):
+                (reference_dir / f"seed_{seed}.json").write_text(
+                    json.dumps({"runtime_seconds": runtime}),
+                    encoding="utf-8",
+                )
+            variants = notebook_workflows._build_ct_efficiency_variants(
+                "cifar10",
+                notebook_workflows.CT_UNLEARNING_PROFILES["cifar10"],
+            )
+            self.assertEqual(
+                [variant_name for variant_name, _ in variants],
+                ["cifar10", "cifar10_epochs_2", "cifar10_epochs_1"],
+            )
+            trial_results = {
+                "cifar10": {"runtime_seconds": 2.4, "best_val_accuracy": 0.86},
+                "cifar10_epochs_2": {"runtime_seconds": 1.5, "best_val_accuracy": 0.84},
+                "cifar10_epochs_1": {"runtime_seconds": 1.0, "best_val_accuracy": 0.79},
+            }
+            selected = notebook_workflows._select_efficiency_variant(
+                algorithm_name="CT",
+                output_family_name="CT",
+                candidate_variants=variants,
+                reference_family_dir=reference_dir,
+                efficiency_ratio=0.2,
+                trial_runner=lambda variant_name, _variant_config: dict(trial_results[variant_name]),
+            )
+            self.assertEqual(selected["selected_variant"], "cifar10_epochs_2")
             self.assertTrue(selected["passed_budget"])
 
 
@@ -206,13 +290,14 @@ class NotebookWorkflowSmokeTests(unittest.TestCase):
         num_models: int,
         runtime_seconds: float,
         seed_offset: int = 0,
+        model_factory: Any = _tiny_model_factory,
     ) -> Path:
         family_dir = checkpoints_root / bundle.context.dataset / bundle.context.task_id / family_name
         family_dir.mkdir(parents=True, exist_ok=True)
         for seed in range(num_models):
             torch.manual_seed(seed + seed_offset)
             model = model_utils.build_model(
-                _tiny_model_factory,
+                model_factory,
                 num_classes=bundle.context.num_classes,
                 dataset=bundle.context.dataset,
             )
@@ -426,6 +511,204 @@ class NotebookWorkflowSmokeTests(unittest.TestCase):
                 )
             self.assertTrue(reused_outputs["seed_bank"][0]["reused_existing"])
 
+    def test_run_msg_unlearning_workflow_creates_checkpoint_metadata_and_plain_loadable_weights(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bundle = self._build_bundle(root)
+            checkpoints_root = root / "checkpoints"
+            base_family_dir = self._write_checkpoint_family(
+                checkpoints_root,
+                bundle,
+                family_name="baseline_train",
+                num_models=1,
+                runtime_seconds=5.0,
+                model_factory=_tiny_conv_model_factory,
+            )
+            with mock.patch.object(notebook_workflows, "create_dataloaders_from_manifest", return_value=bundle), mock.patch.object(
+                notebook_workflows,
+                "create_resnet18",
+                new=_tiny_conv_model_factory,
+            ):
+                outputs = notebook_workflows.run_msg_unlearning_workflow(
+                    dataset="cifar10",
+                    base_family_dir=base_family_dir,
+                    output_family_name="MSG",
+                    num_bank_seeds=1,
+                    profile="cifar10",
+                    checkpoint_dir=checkpoints_root,
+                    device_name="cpu",
+                    use_wandb=False,
+                    image_size=32,
+                    reuse_existing=False,
+                )
+            self.assertEqual(outputs["family_name"], "MSG")
+            self.assertEqual(len(outputs["seed_bank"]), 1)
+            metadata = outputs["seed_bank"][0]
+            checkpoint_path = Path(metadata["checkpoint_path"])
+            self.assertTrue(checkpoint_path.exists())
+            saved_metadata = json.loads(checkpoint_path.with_suffix(".json").read_text(encoding="utf-8"))
+            self.assertEqual(saved_metadata["unlearning_algorithm"], "MSG")
+            self.assertEqual(saved_metadata["algorithm_source_alias"], "KGLTop2")
+            self.assertEqual(saved_metadata["algorithm_profile"], "cifar10")
+            self.assertTrue(saved_metadata["runtime_excludes_validation"])
+            self.assertEqual(saved_metadata["algorithm_hyperparameters"]["init_rate"], 0.3)
+            self.assertTrue(
+                {"retain_loss", "val_accuracy", "stage", "learning_rate"}.issubset(
+                    saved_metadata["epochs_logged"][0]
+                )
+            )
+
+            plain_model = model_utils.build_model(
+                _tiny_conv_model_factory,
+                num_classes=bundle.context.num_classes,
+                dataset=bundle.context.dataset,
+            )
+            state_dict = torch.load(checkpoint_path, map_location="cpu")
+            plain_model.load_state_dict(state_dict, strict=True)
+
+    def test_run_msg_unlearning_workflow_reuses_matching_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bundle = self._build_bundle(root)
+            checkpoints_root = root / "checkpoints"
+            base_family_dir = self._write_checkpoint_family(
+                checkpoints_root,
+                bundle,
+                family_name="baseline_train",
+                num_models=1,
+                runtime_seconds=5.0,
+                model_factory=_tiny_conv_model_factory,
+            )
+            common_kwargs = {
+                "dataset": "cifar10",
+                "base_family_dir": base_family_dir,
+                "output_family_name": "MSG",
+                "num_bank_seeds": 1,
+                "profile": "cifar10",
+                "checkpoint_dir": checkpoints_root,
+                "device_name": "cpu",
+                "use_wandb": False,
+                "image_size": 32,
+            }
+            with mock.patch.object(notebook_workflows, "create_dataloaders_from_manifest", return_value=bundle), mock.patch.object(
+                notebook_workflows,
+                "create_resnet18",
+                new=_tiny_conv_model_factory,
+            ):
+                notebook_workflows.run_msg_unlearning_workflow(
+                    **common_kwargs,
+                    reuse_existing=False,
+                )
+            with mock.patch.object(notebook_workflows, "create_dataloaders_from_manifest", return_value=bundle), mock.patch.object(
+                notebook_workflows,
+                "create_resnet18",
+                new=_tiny_conv_model_factory,
+            ), mock.patch.object(
+                notebook_workflows,
+                "load_model_checkpoint",
+                side_effect=AssertionError("MSG reuse should skip model loading"),
+            ):
+                reused_outputs = notebook_workflows.run_msg_unlearning_workflow(
+                    **common_kwargs,
+                    reuse_existing=True,
+                )
+            self.assertTrue(reused_outputs["seed_bank"][0]["reused_existing"])
+
+    def test_run_ct_unlearning_workflow_creates_checkpoint_and_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bundle = self._build_bundle(root)
+            checkpoints_root = root / "checkpoints"
+            base_family_dir = self._write_checkpoint_family(
+                checkpoints_root,
+                bundle,
+                family_name="baseline_train",
+                num_models=1,
+                runtime_seconds=5.0,
+                model_factory=_tiny_conv_model_factory,
+            )
+            with mock.patch.object(notebook_workflows, "create_dataloaders_from_manifest", return_value=bundle), mock.patch.object(
+                notebook_workflows,
+                "create_resnet18",
+                new=_tiny_conv_model_factory,
+            ):
+                outputs = notebook_workflows.run_ct_unlearning_workflow(
+                    dataset="cifar10",
+                    base_family_dir=base_family_dir,
+                    output_family_name="CT",
+                    num_bank_seeds=1,
+                    profile="cifar10",
+                    checkpoint_dir=checkpoints_root,
+                    device_name="cpu",
+                    use_wandb=False,
+                    image_size=32,
+                    reuse_existing=False,
+                )
+            self.assertEqual(outputs["family_name"], "CT")
+            self.assertEqual(len(outputs["seed_bank"]), 1)
+            metadata = outputs["seed_bank"][0]
+            checkpoint_path = Path(metadata["checkpoint_path"])
+            self.assertTrue(checkpoint_path.exists())
+            saved_metadata = json.loads(checkpoint_path.with_suffix(".json").read_text(encoding="utf-8"))
+            self.assertEqual(saved_metadata["unlearning_algorithm"], "CT")
+            self.assertEqual(saved_metadata["algorithm_source_alias"], "KGLTop5")
+            self.assertEqual(saved_metadata["algorithm_profile"], "cifar10")
+            self.assertTrue(saved_metadata["runtime_excludes_validation"])
+            self.assertEqual(saved_metadata["algorithm_hyperparameters"]["epochs"], 3)
+            self.assertTrue(
+                {"retain_loss", "val_accuracy", "stage", "learning_rate"}.issubset(
+                    saved_metadata["epochs_logged"][0]
+                )
+            )
+
+    def test_run_ct_unlearning_workflow_reuses_matching_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bundle = self._build_bundle(root)
+            checkpoints_root = root / "checkpoints"
+            base_family_dir = self._write_checkpoint_family(
+                checkpoints_root,
+                bundle,
+                family_name="baseline_train",
+                num_models=1,
+                runtime_seconds=5.0,
+                model_factory=_tiny_conv_model_factory,
+            )
+            common_kwargs = {
+                "dataset": "cifar10",
+                "base_family_dir": base_family_dir,
+                "output_family_name": "CT",
+                "num_bank_seeds": 1,
+                "profile": "cifar10",
+                "checkpoint_dir": checkpoints_root,
+                "device_name": "cpu",
+                "use_wandb": False,
+                "image_size": 32,
+            }
+            with mock.patch.object(notebook_workflows, "create_dataloaders_from_manifest", return_value=bundle), mock.patch.object(
+                notebook_workflows,
+                "create_resnet18",
+                new=_tiny_conv_model_factory,
+            ):
+                notebook_workflows.run_ct_unlearning_workflow(
+                    **common_kwargs,
+                    reuse_existing=False,
+                )
+            with mock.patch.object(notebook_workflows, "create_dataloaders_from_manifest", return_value=bundle), mock.patch.object(
+                notebook_workflows,
+                "create_resnet18",
+                new=_tiny_conv_model_factory,
+            ), mock.patch.object(
+                notebook_workflows,
+                "load_model_checkpoint",
+                side_effect=AssertionError("CT reuse should skip model loading"),
+            ):
+                reused_outputs = notebook_workflows.run_ct_unlearning_workflow(
+                    **common_kwargs,
+                    reuse_existing=True,
+                )
+            self.assertTrue(reused_outputs["seed_bank"][0]["reused_existing"])
+
     def test_run_benchmark_notebook_workflow_supports_multiple_candidate_families(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -472,6 +755,22 @@ class NotebookWorkflowSmokeTests(unittest.TestCase):
                 runtime_seconds=1.1,
                 seed_offset=40,
             )
+            msg_dir = self._write_checkpoint_family(
+                checkpoints_root,
+                bundle,
+                family_name="MSG",
+                num_models=2,
+                runtime_seconds=1.2,
+                seed_offset=50,
+            )
+            ct_dir = self._write_checkpoint_family(
+                checkpoints_root,
+                bundle,
+                family_name="CT",
+                num_models=2,
+                runtime_seconds=0.9,
+                seed_offset=60,
+            )
             with _pushd(root), mock.patch.object(
                 benchmark_utils,
                 "create_dataloaders_from_manifest",
@@ -490,6 +789,8 @@ class NotebookWorkflowSmokeTests(unittest.TestCase):
                         "FanchuanUnlearning": fanchuan_dir,
                         "SCRUB": scrub_dir,
                         "DELETE": delete_dir,
+                        "MSG": msg_dir,
+                        "CT": ct_dir,
                     },
                     efficiency_ratio=0.2,
                     data_root=root,
@@ -503,9 +804,13 @@ class NotebookWorkflowSmokeTests(unittest.TestCase):
             self.assertIn("FanchuanUnlearning", outputs["family_summaries"])
             self.assertIn("SCRUB", outputs["family_summaries"])
             self.assertIn("DELETE", outputs["family_summaries"])
+            self.assertIn("MSG", outputs["family_summaries"])
+            self.assertIn("CT", outputs["family_summaries"])
             self.assertIn("FanchuanUnlearning", outputs["comparisons_to_reference"])
             self.assertIn("SCRUB", outputs["comparisons_to_reference"])
             self.assertIn("DELETE", outputs["comparisons_to_reference"])
+            self.assertIn("MSG", outputs["comparisons_to_reference"])
+            self.assertIn("CT", outputs["comparisons_to_reference"])
 
 
 if __name__ == "__main__":
