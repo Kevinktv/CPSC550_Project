@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="460" viewBox="0 0 1440 460">
+<text x="720" y="24" text-anchor="middle" font-size="20" font-family="Arial, sans-serif" font-weight="700">Dataset: MUFAC | Task: forget_mixed</text>
+<g transform="translate(10, 30)">
+<rect x="0" y="0" width="700" height="420" fill="white" />
+<text x="350.00" y="28.00" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" font-weight="700">MUFAC: Train / Val / Test</text>
+<line x1="60" y1="360.00" x2="680" y2="360.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="364.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">0</text>
+<line x1="60" y1="299.00" x2="680" y2="299.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="303.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">255</text>
+<line x1="60" y1="238.00" x2="680" y2="238.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="242.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">510</text>
+<line x1="60" y1="177.00" x2="680" y2="177.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="181.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">764</text>
+<line x1="60" y1="116.00" x2="680" y2="116.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="120.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">1019</text>
+<line x1="60" y1="55.00" x2="680" y2="55.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="59.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">1274</text>
+<line x1="60" y1="55" x2="60" y2="360" stroke="#222" stroke-width="1.5" />
+<line x1="60" y1="360" x2="680" y2="360" stroke="#222" stroke-width="1.5" />
+<text x="15.00" y="207.50" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" transform="rotate(-90, 15, 200)" fill="#333">Count</text>
+<text x="370.00" y="402.00" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" fill="#333">Class</text>
+<rect x="70.85" y="55.00" width="16.60" height="305.00" fill="#1f77b4" />
+<rect x="89.45" y="301.11" width="16.60" height="58.89" fill="#ff7f0e" />
+<rect x="108.05" y="301.59" width="16.60" height="58.41" fill="#2ca02c" />
+<text x="98.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">a</text>
+<rect x="148.35" y="76.55" width="16.60" height="283.45" fill="#1f77b4" />
+<rect x="166.95" y="298.71" width="16.60" height="61.29" fill="#ff7f0e" />
+<rect x="185.55" y="301.82" width="16.60" height="58.18" fill="#2ca02c" />
+<text x="176.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">b</text>
+<rect x="225.85" y="94.02" width="16.60" height="265.98" fill="#1f77b4" />
+<rect x="244.45" y="309.49" width="16.60" height="50.51" fill="#ff7f0e" />
+<rect x="263.05" y="310.20" width="16.60" height="49.80" fill="#2ca02c" />
+<text x="253.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">c</text>
+<rect x="303.35" y="153.16" width="16.60" height="206.84" fill="#1f77b4" />
+<rect x="321.95" y="309.73" width="16.60" height="50.27" fill="#ff7f0e" />
+<rect x="340.55" y="314.75" width="16.60" height="45.25" fill="#2ca02c" />
+<text x="331.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">d</text>
+<rect x="380.85" y="107.19" width="16.60" height="252.81" fill="#1f77b4" />
+<rect x="399.45" y="318.58" width="16.60" height="41.42" fill="#ff7f0e" />
+<rect x="418.05" y="323.13" width="16.60" height="36.87" fill="#2ca02c" />
+<text x="408.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">e</text>
+<rect x="458.35" y="217.32" width="16.60" height="142.68" fill="#1f77b4" />
+<rect x="476.95" y="341.09" width="16.60" height="18.91" fill="#ff7f0e" />
+<rect x="495.55" y="345.88" width="16.60" height="14.12" fill="#2ca02c" />
+<text x="486.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">f</text>
+<rect x="535.85" y="285.31" width="16.60" height="74.69" fill="#1f77b4" />
+<rect x="554.45" y="352.34" width="16.60" height="7.66" fill="#ff7f0e" />
+<rect x="573.05" y="355.45" width="16.60" height="4.55" fill="#2ca02c" />
+<text x="563.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">g</text>
+<rect x="613.35" y="316.67" width="16.60" height="43.33" fill="#1f77b4" />
+<rect x="631.95" y="359.04" width="16.60" height="0.96" fill="#ff7f0e" />
+<rect x="650.55" y="359.52" width="16.60" height="0.48" fill="#2ca02c" />
+<text x="641.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">h</text>
+<rect x="540" y="18" width="12" height="12" fill="#1f77b4" />
+<text x="558.00" y="29.00" font-size="11" font-family="Arial, sans-serif" fill="#333">train</text>
+<rect x="540" y="38" width="12" height="12" fill="#ff7f0e" />
+<text x="558.00" y="49.00" font-size="11" font-family="Arial, sans-serif" fill="#333">val</text>
+<rect x="540" y="58" width="12" height="12" fill="#2ca02c" />
+<text x="558.00" y="69.00" font-size="11" font-family="Arial, sans-serif" fill="#333">test</text>
+</g>
+<g transform="translate(730, 30)">
+<rect x="0" y="0" width="700" height="420" fill="white" />
+<text x="350.00" y="28.00" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" font-weight="700">MUFAC: Retrain / Forget</text>
+<line x1="60" y1="360.00" x2="680" y2="360.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="364.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">0</text>
+<line x1="60" y1="299.00" x2="680" y2="299.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="303.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">211</text>
+<line x1="60" y1="238.00" x2="680" y2="238.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="242.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">422</text>
+<line x1="60" y1="177.00" x2="680" y2="177.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="181.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">634</text>
+<line x1="60" y1="116.00" x2="680" y2="116.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="120.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">845</text>
+<line x1="60" y1="55.00" x2="680" y2="55.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="59.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">1056</text>
+<line x1="60" y1="55" x2="60" y2="360" stroke="#222" stroke-width="1.5" />
+<line x1="60" y1="360" x2="680" y2="360" stroke="#222" stroke-width="1.5" />
+<text x="15.00" y="207.50" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" transform="rotate(-90, 15, 200)" fill="#333">Count</text>
+<text x="370.00" y="402.00" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" fill="#333">Class</text>
+<rect x="70.85" y="76.66" width="25.90" height="283.34" fill="#17becf" />
+<rect x="98.75" y="275.37" width="25.90" height="84.63" fill="#d62728" />
+<text x="98.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">a</text>
+<rect x="148.35" y="96.88" width="25.90" height="263.12" fill="#17becf" />
+<rect x="176.25" y="281.15" width="25.90" height="78.85" fill="#d62728" />
+<text x="176.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">b</text>
+<rect x="225.85" y="113.05" width="25.90" height="246.95" fill="#17becf" />
+<rect x="253.75" y="286.06" width="25.90" height="73.94" fill="#d62728" />
+<text x="253.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">c</text>
+<rect x="303.35" y="110.45" width="25.90" height="249.55" fill="#17becf" />
+<rect x="331.25" y="360.00" width="25.90" height="0.00" fill="#d62728" />
+<text x="331.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">d</text>
+<rect x="380.85" y="55.00" width="25.90" height="305.00" fill="#17becf" />
+<rect x="408.75" y="360.00" width="25.90" height="0.00" fill="#d62728" />
+<text x="408.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">e</text>
+<rect x="458.35" y="187.86" width="25.90" height="172.14" fill="#17becf" />
+<rect x="486.25" y="360.00" width="25.90" height="0.00" fill="#d62728" />
+<text x="486.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">f</text>
+<rect x="535.85" y="269.89" width="25.90" height="90.11" fill="#17becf" />
+<rect x="563.75" y="360.00" width="25.90" height="0.00" fill="#d62728" />
+<text x="563.75" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">g</text>
+<rect x="613.35" y="307.72" width="25.90" height="52.28" fill="#17becf" />
+<rect x="641.25" y="360.00" width="25.90" height="0.00" fill="#d62728" />
+<text x="641.25" y="378.00" font-size="11" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">h</text>
+<rect x="540" y="18" width="12" height="12" fill="#17becf" />
+<text x="558.00" y="29.00" font-size="11" font-family="Arial, sans-serif" fill="#333">retrain</text>
+<rect x="540" y="38" width="12" height="12" fill="#d62728" />
+<text x="558.00" y="49.00" font-size="11" font-family="Arial, sans-serif" fill="#333">forget</text>
+</g>
+</svg>

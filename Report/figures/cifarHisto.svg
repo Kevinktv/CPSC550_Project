@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="460" viewBox="0 0 1440 460">
+<text x="720" y="24" text-anchor="middle" font-size="20" font-family="Arial, sans-serif" font-weight="700">Dataset: CIFAR-10 | Task: forget_mixed</text>
+<g transform="translate(10, 30)">
+<rect x="0" y="0" width="700" height="420" fill="white" />
+<text x="350.00" y="28.00" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" font-weight="700">CIFAR-10: Train / Val / Test</text>
+<line x1="60" y1="360.00" x2="680" y2="360.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="364.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">0</text>
+<line x1="60" y1="299.00" x2="680" y2="299.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="303.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">900</text>
+<line x1="60" y1="238.00" x2="680" y2="238.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="242.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">1800</text>
+<line x1="60" y1="177.00" x2="680" y2="177.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="181.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">2700</text>
+<line x1="60" y1="116.00" x2="680" y2="116.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="120.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">3600</text>
+<line x1="60" y1="55.00" x2="680" y2="55.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="59.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">4500</text>
+<line x1="60" y1="55" x2="60" y2="360" stroke="#222" stroke-width="1.5" />
+<line x1="60" y1="360" x2="680" y2="360" stroke="#222" stroke-width="1.5" />
+<text x="15.00" y="207.50" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" transform="rotate(-90, 15, 200)" fill="#333">Count</text>
+<text x="370.00" y="402.00" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" fill="#333">Class</text>
+<rect x="68.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="83.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="98.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="91.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">airplane</text>
+<rect x="130.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="145.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="160.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="153.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">automobile</text>
+<rect x="192.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="207.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="222.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="215.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">bird</text>
+<rect x="254.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="269.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="284.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="277.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">cat</text>
+<rect x="316.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="331.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="346.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="339.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">deer</text>
+<rect x="378.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="393.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="408.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="401.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">dog</text>
+<rect x="440.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="455.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="470.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="463.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">frog</text>
+<rect x="502.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="517.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="532.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="525.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">horse</text>
+<rect x="564.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="579.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="594.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="587.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">ship</text>
+<rect x="626.68" y="55.00" width="12.88" height="305.00" fill="#1f77b4" />
+<rect x="641.56" y="326.11" width="12.88" height="33.89" fill="#ff7f0e" />
+<rect x="656.44" y="292.22" width="12.88" height="67.78" fill="#2ca02c" />
+<text x="649.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">truck</text>
+<rect x="540" y="18" width="12" height="12" fill="#1f77b4" />
+<text x="558.00" y="29.00" font-size="11" font-family="Arial, sans-serif" fill="#333">train</text>
+<rect x="540" y="38" width="12" height="12" fill="#ff7f0e" />
+<text x="558.00" y="49.00" font-size="11" font-family="Arial, sans-serif" fill="#333">val</text>
+<rect x="540" y="58" width="12" height="12" fill="#2ca02c" />
+<text x="558.00" y="69.00" font-size="11" font-family="Arial, sans-serif" fill="#333">test</text>
+</g>
+<g transform="translate(730, 30)">
+<rect x="0" y="0" width="700" height="420" fill="white" />
+<text x="350.00" y="28.00" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" font-weight="700">CIFAR-10: Retrain / Forget</text>
+<line x1="60" y1="360.00" x2="680" y2="360.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="364.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">0</text>
+<line x1="60" y1="299.00" x2="680" y2="299.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="303.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">900</text>
+<line x1="60" y1="238.00" x2="680" y2="238.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="242.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">1800</text>
+<line x1="60" y1="177.00" x2="680" y2="177.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="181.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">2700</text>
+<line x1="60" y1="116.00" x2="680" y2="116.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="120.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">3600</text>
+<line x1="60" y1="55.00" x2="680" y2="55.00" stroke="#d9d9d9" stroke-width="1" />
+<text x="52.00" y="59.00" text-anchor="end" font-size="11" font-family="Arial, sans-serif" fill="#555">4500</text>
+<line x1="60" y1="55" x2="60" y2="360" stroke="#222" stroke-width="1.5" />
+<line x1="60" y1="360" x2="680" y2="360" stroke="#222" stroke-width="1.5" />
+<text x="15.00" y="207.50" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" transform="rotate(-90, 15, 200)" fill="#333">Count</text>
+<text x="370.00" y="402.00" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" fill="#333">Class</text>
+<rect x="68.68" y="156.67" width="20.32" height="203.33" fill="#17becf" />
+<rect x="91.00" y="258.33" width="20.32" height="101.67" fill="#d62728" />
+<text x="91.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">airplane</text>
+<rect x="130.68" y="156.67" width="20.32" height="203.33" fill="#17becf" />
+<rect x="153.00" y="258.33" width="20.32" height="101.67" fill="#d62728" />
+<text x="153.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">automobile</text>
+<rect x="192.68" y="156.67" width="20.32" height="203.33" fill="#17becf" />
+<rect x="215.00" y="258.33" width="20.32" height="101.67" fill="#d62728" />
+<text x="215.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">bird</text>
+<rect x="254.68" y="55.00" width="20.32" height="305.00" fill="#17becf" />
+<rect x="277.00" y="360.00" width="20.32" height="0.00" fill="#d62728" />
+<text x="277.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">cat</text>
+<rect x="316.68" y="55.00" width="20.32" height="305.00" fill="#17becf" />
+<rect x="339.00" y="360.00" width="20.32" height="0.00" fill="#d62728" />
+<text x="339.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">deer</text>
+<rect x="378.68" y="55.00" width="20.32" height="305.00" fill="#17becf" />
+<rect x="401.00" y="360.00" width="20.32" height="0.00" fill="#d62728" />
+<text x="401.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">dog</text>
+<rect x="440.68" y="55.00" width="20.32" height="305.00" fill="#17becf" />
+<rect x="463.00" y="360.00" width="20.32" height="0.00" fill="#d62728" />
+<text x="463.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">frog</text>
+<rect x="502.68" y="55.00" width="20.32" height="305.00" fill="#17becf" />
+<rect x="525.00" y="360.00" width="20.32" height="0.00" fill="#d62728" />
+<text x="525.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">horse</text>
+<rect x="564.68" y="55.00" width="20.32" height="305.00" fill="#17becf" />
+<rect x="587.00" y="360.00" width="20.32" height="0.00" fill="#d62728" />
+<text x="587.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">ship</text>
+<rect x="626.68" y="55.00" width="20.32" height="305.00" fill="#17becf" />
+<rect x="649.00" y="360.00" width="20.32" height="0.00" fill="#d62728" />
+<text x="649.00" y="378.00" font-size="9" font-family="Arial, sans-serif" fill="#333" text-anchor="middle">truck</text>
+<rect x="540" y="18" width="12" height="12" fill="#17becf" />
+<text x="558.00" y="29.00" font-size="11" font-family="Arial, sans-serif" fill="#333">retrain</text>
+<rect x="540" y="38" width="12" height="12" fill="#d62728" />
+<text x="558.00" y="49.00" font-size="11" font-family="Arial, sans-serif" fill="#333">forget</text>
+</g>
+</svg>
