@@ -261,6 +261,164 @@ def _svg_text(x: float, y: float, text: str, extra: str = "") -> str:
     return f'<text x="{x:.2f}" y="{y:.2f}" {extra}>{html.escape(text)}</text>'
 
 
+def _hex_to_rgb(color: str) -> tuple[float, float, float]:
+    """Convert a CSS-style hex color into normalized RGB components."""
+    value = color.lstrip("#")
+    if len(value) != 6:
+        raise ValueError(f"Expected #RRGGBB color, found: {color}")
+    return tuple(int(value[index:index + 2], 16) / 255.0 for index in (0, 2, 4))
+
+
+def _pdf_escape_text(text: str) -> str:
+    """Escape a string for use in a PDF text operator."""
+    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _estimate_pdf_text_width(text: str, font_size: float) -> float:
+    """Return a lightweight width estimate for base-font PDF text placement."""
+    width_units = 0.0
+    for character in text:
+        if character == " ":
+            width_units += 0.33
+        elif character in ".,;:!|ijlI'`":
+            width_units += 0.28
+        elif character in "MWQG@%&wm":
+            width_units += 0.9
+        elif character.isupper():
+            width_units += 0.68
+        else:
+            width_units += 0.56
+    return width_units * font_size
+
+
+def _pdf_rect(
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    color: str,
+    page_height: float,
+) -> str:
+    """Return a filled PDF rectangle using SVG-style top-left coordinates."""
+    r, g, b = _hex_to_rgb(color)
+    pdf_y = page_height - y - height
+    return (
+        f"{r:.4f} {g:.4f} {b:.4f} rg\n"
+        f"{x:.2f} {pdf_y:.2f} {width:.2f} {height:.2f} re f"
+    )
+
+
+def _pdf_line(
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
+    color: str,
+    line_width: float,
+    page_height: float,
+) -> str:
+    """Return a stroked PDF line using SVG-style top-left coordinates."""
+    r, g, b = _hex_to_rgb(color)
+    return (
+        f"{r:.4f} {g:.4f} {b:.4f} RG\n"
+        f"{line_width:.2f} w\n"
+        f"{x1:.2f} {page_height - y1:.2f} m\n"
+        f"{x2:.2f} {page_height - y2:.2f} l S"
+    )
+
+
+def _pdf_text(
+    x: float,
+    y: float,
+    text: str,
+    *,
+    font_name: str,
+    font_size: float,
+    color: str,
+    page_height: float,
+    anchor: str = "start",
+    rotation_degrees: int = 0,
+) -> str:
+    """Return a PDF text operator using base-14 fonts."""
+    text_width = _estimate_pdf_text_width(text, font_size)
+    adjusted_x = x
+    if anchor == "middle":
+        adjusted_x -= text_width / 2
+    elif anchor == "end":
+        adjusted_x -= text_width
+    elif anchor != "start":
+        raise ValueError(f"Unsupported anchor: {anchor}")
+
+    r, g, b = _hex_to_rgb(color)
+    if rotation_degrees == -90:
+        matrix = f"0 -1 1 0 {adjusted_x:.2f} {page_height - y:.2f} Tm"
+    elif rotation_degrees == 0:
+        matrix = f"1 0 0 1 {adjusted_x:.2f} {page_height - y:.2f} Tm"
+    else:
+        raise ValueError(f"Unsupported text rotation: {rotation_degrees}")
+
+    return "\n".join(
+        [
+            "BT",
+            f"/{font_name} {font_size:.2f} Tf",
+            f"{r:.4f} {g:.4f} {b:.4f} rg",
+            matrix,
+            f"({_pdf_escape_text(text)}) Tj",
+            "ET",
+        ]
+    )
+
+
+def _write_single_page_pdf(path: Path, width: int, height: int, content_stream: str) -> None:
+    """Write a minimal single-page PDF with Helvetica base fonts."""
+    objects: list[bytes] = []
+
+    def add_object(data: bytes) -> int:
+        objects.append(data)
+        return len(objects)
+
+    font_regular_id = add_object(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    )
+    font_bold_id = add_object(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"
+    )
+    stream_bytes = content_stream.encode("utf-8")
+    contents_id = add_object(
+        b"<< /Length " + str(len(stream_bytes)).encode("ascii") + b" >>\nstream\n" + stream_bytes + b"\nendstream"
+    )
+    page_id = add_object(
+        (
+            f"<< /Type /Page /Parent 5 0 R /MediaBox [0 0 {width} {height}] "
+            f"/Resources << /ProcSet [/PDF /Text] /Font << /F1 {font_regular_id} 0 R /F2 {font_bold_id} 0 R >> >> "
+            f"/Contents {contents_id} 0 R >>"
+        ).encode("ascii")
+    )
+    pages_id = add_object(f"<< /Type /Pages /Kids [{page_id} 0 R] /Count 1 >>".encode("ascii"))
+    catalog_id = add_object(f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode("ascii"))
+
+    pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for object_id, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{object_id} 0 obj\n".encode("ascii"))
+        pdf.extend(obj)
+        pdf.extend(b"\nendobj\n")
+
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend(
+        (
+            f"trailer << /Size {len(objects) + 1} /Root {catalog_id} 0 R >>\n"
+            f"startxref\n{xref_offset}\n%%EOF\n"
+        ).encode("ascii")
+    )
+    path.write_bytes(pdf)
+
+
 def display_dataset_name(dataset: str) -> str:
     """Return a reader-friendly dataset name for plot titles."""
     names = {
@@ -390,6 +548,179 @@ def render_grouped_bar_chart(
     return "\n".join(elements)
 
 
+def render_grouped_bar_chart_pdf(
+    *,
+    title: str,
+    labels: list[str],
+    series: dict[str, dict[str, int]],
+    colors: dict[str, str],
+    origin_x: int,
+    origin_y: int,
+    page_height: int,
+    width: int = 700,
+    height: int = 420,
+) -> str:
+    """Render one grouped bar chart as PDF drawing commands."""
+    margin_left = 60
+    margin_right = 20
+    margin_top = 55
+    margin_bottom = 60
+    plot_width = width - margin_left - margin_right
+    plot_height = height - margin_top - margin_bottom
+    max_value = max(
+        1,
+        max(value for distribution in series.values() for value in distribution.values()),
+    )
+
+    ticks = 5
+    category_width = plot_width / max(1, len(labels))
+    group_width = category_width * 0.72
+    bar_width = group_width / max(1, len(series))
+    group_left_offset = (category_width - group_width) / 2
+    label_font_size = 9 if max((len(label) for label in labels), default=0) > 6 else 11
+
+    commands = [
+        _pdf_rect(origin_x, origin_y, width, height, "#ffffff", page_height),
+        _pdf_text(
+            origin_x + (width / 2),
+            origin_y + 28,
+            title,
+            font_name="F2",
+            font_size=18,
+            color="#000000",
+            page_height=page_height,
+            anchor="middle",
+        ),
+    ]
+
+    for tick in range(ticks + 1):
+        value = round(max_value * tick / ticks)
+        y = origin_y + margin_top + plot_height - (plot_height * tick / ticks)
+        commands.append(
+            _pdf_line(
+                origin_x + margin_left,
+                y,
+                origin_x + width - margin_right,
+                y,
+                "#d9d9d9",
+                1.0,
+                page_height,
+            )
+        )
+        commands.append(
+            _pdf_text(
+                origin_x + margin_left - 8,
+                y + 4,
+                str(value),
+                font_name="F1",
+                font_size=11,
+                color="#555555",
+                page_height=page_height,
+                anchor="end",
+            )
+        )
+
+    axis_bottom = origin_y + margin_top + plot_height
+    commands.append(
+        _pdf_line(
+            origin_x + margin_left,
+            origin_y + margin_top,
+            origin_x + margin_left,
+            axis_bottom,
+            "#222222",
+            1.5,
+            page_height,
+        )
+    )
+    commands.append(
+        _pdf_line(
+            origin_x + margin_left,
+            axis_bottom,
+            origin_x + width - margin_right,
+            axis_bottom,
+            "#222222",
+            1.5,
+            page_height,
+        )
+    )
+    commands.append(
+        _pdf_text(
+            origin_x + margin_left - 45,
+            origin_y + margin_top + (plot_height / 2),
+            "Count",
+            font_name="F1",
+            font_size=12,
+            color="#333333",
+            page_height=page_height,
+            anchor="middle",
+            rotation_degrees=-90,
+        )
+    )
+    commands.append(
+        _pdf_text(
+            origin_x + margin_left + (plot_width / 2),
+            origin_y + height - 18,
+            "Class",
+            font_name="F1",
+            font_size=12,
+            color="#333333",
+            page_height=page_height,
+            anchor="middle",
+        )
+    )
+
+    series_names = list(series)
+    for label_index, label in enumerate(labels):
+        category_x = origin_x + margin_left + (label_index * category_width)
+        for series_index, series_name in enumerate(series_names):
+            value = series[series_name].get(label, 0)
+            bar_height = 0 if max_value == 0 else (value / max_value) * plot_height
+            x = category_x + group_left_offset + (series_index * bar_width)
+            y = axis_bottom - bar_height
+            commands.append(
+                _pdf_rect(
+                    x,
+                    y,
+                    max(0.0, bar_width - 2),
+                    bar_height,
+                    colors[series_name],
+                    page_height,
+                )
+            )
+
+        commands.append(
+            _pdf_text(
+                category_x + (category_width / 2),
+                axis_bottom + 18,
+                label,
+                font_name="F1",
+                font_size=label_font_size,
+                color="#333333",
+                page_height=page_height,
+                anchor="middle",
+            )
+        )
+
+    legend_x = origin_x + width - margin_right - 140
+    legend_y = origin_y + 18
+    for legend_index, series_name in enumerate(series_names):
+        y = legend_y + (legend_index * 20)
+        commands.append(_pdf_rect(legend_x, y, 12, 12, colors[series_name], page_height))
+        commands.append(
+            _pdf_text(
+                legend_x + 18,
+                y + 11,
+                series_name,
+                font_name="F1",
+                font_size=11,
+                color="#333333",
+                page_height=page_height,
+            )
+        )
+
+    return "\n".join(commands)
+
+
 def write_task_histogram_svg(task: dict[str, Any], project_root: Path) -> str:
     """Write a side-by-side SVG histogram summary for one task."""
     figures_root = project_root / "Report" / "figures"
@@ -443,6 +774,68 @@ def write_task_histogram_svg(task: dict[str, Any], project_root: Path) -> str:
     )
 
     output_path.write_text(svg, encoding="utf-8", newline="\n")
+    return relative_path
+
+
+def write_task_histogram_pdf(task: dict[str, Any], project_root: Path) -> str:
+    """Write a side-by-side PDF histogram summary for one task."""
+    figures_root = project_root / "Report" / "figures"
+    figures_root.mkdir(parents=True, exist_ok=True)
+    filename = f"{task['dataset']}_{task['task_id']}_histograms.pdf"
+    relative_path = f"Report/figures/{filename}"
+    output_path = figures_root / filename
+
+    page_width = 1440
+    page_height = 460
+    labels = list(task["label_distributions"]["train"])
+    dataset_name = display_dataset_name(task["dataset"])
+
+    commands = [
+        _pdf_text(
+            page_width / 2,
+            24,
+            f"Dataset: {dataset_name} | Task: {task['task_id']}",
+            font_name="F2",
+            font_size=20,
+            color="#000000",
+            page_height=page_height,
+            anchor="middle",
+        ),
+        render_grouped_bar_chart_pdf(
+            title=f"{dataset_name}: Train / Val / Test",
+            labels=labels,
+            series={
+                "train": task["label_distributions"]["train"],
+                "val": task["label_distributions"]["val"],
+                "test": task["label_distributions"]["test"],
+            },
+            colors={
+                "train": "#1f77b4",
+                "val": "#ff7f0e",
+                "test": "#2ca02c",
+            },
+            origin_x=10,
+            origin_y=30,
+            page_height=page_height,
+        ),
+        render_grouped_bar_chart_pdf(
+            title=f"{dataset_name}: Retrain / Forget",
+            labels=labels,
+            series={
+                "retrain": task["label_distributions"]["retrain"],
+                "forget": task["label_distributions"]["forget"],
+            },
+            colors={
+                "retrain": "#17becf",
+                "forget": "#d62728",
+            },
+            origin_x=730,
+            origin_y=30,
+            page_height=page_height,
+        ),
+    ]
+
+    _write_single_page_pdf(output_path, page_width, page_height, "\n".join(commands))
     return relative_path
 
 
@@ -810,6 +1203,7 @@ def generate_cifar10(
         "source_fingerprint": samples_fingerprint,
     }
     task["artifacts"]["histogram_svg"] = write_task_histogram_svg(task, project_root)
+    task["artifacts"]["histogram_pdf"] = write_task_histogram_pdf(task, project_root)
     validate_task(task, known_ids)
     write_task_manifest(task, task_root / f"{task['task_id']}.json")
 
@@ -941,6 +1335,7 @@ def generate_mufac(
         "source_fingerprint": source_fingerprint,
     }
     task["artifacts"]["histogram_svg"] = write_task_histogram_svg(task, project_root)
+    task["artifacts"]["histogram_pdf"] = write_task_histogram_pdf(task, project_root)
     validate_task(task, known_ids)
     write_task_manifest(task, task_root / f"{task['task_id']}.json")
 
@@ -959,9 +1354,12 @@ def verify_cifar10_outputs(dataset_root: Path, project_root: Path) -> None:
 
     task = tasks[0]
     validate_task(task, known_ids)
-    histogram_path = project_root / task["artifacts"]["histogram_svg"]
-    if not histogram_path.exists():
-        raise ValueError(f"CIFAR-10 histogram is missing: {histogram_path}")
+    histogram_svg_path = project_root / task["artifacts"]["histogram_svg"]
+    if not histogram_svg_path.exists():
+        raise ValueError(f"CIFAR-10 histogram SVG is missing: {histogram_svg_path}")
+    histogram_pdf_path = project_root / task["artifacts"]["histogram_pdf"]
+    if not histogram_pdf_path.exists():
+        raise ValueError(f"CIFAR-10 histogram PDF is missing: {histogram_pdf_path}")
 
     val_counter = Counter(sample_lookup[sample_id]["label_name"] for sample_id in task["val_ids"])
     for class_name in CIFAR10_CLASSES:
@@ -1018,9 +1416,12 @@ def verify_mufac_outputs(dataset_root: Path, project_root: Path) -> None:
 
     task = tasks[0]
     validate_task(task, known_ids)
-    histogram_path = project_root / task["artifacts"]["histogram_svg"]
-    if not histogram_path.exists():
-        raise ValueError(f"MUFAC histogram is missing: {histogram_path}")
+    histogram_svg_path = project_root / task["artifacts"]["histogram_svg"]
+    if not histogram_svg_path.exists():
+        raise ValueError(f"MUFAC histogram SVG is missing: {histogram_svg_path}")
+    histogram_pdf_path = project_root / task["artifacts"]["histogram_pdf"]
+    if not histogram_pdf_path.exists():
+        raise ValueError(f"MUFAC histogram PDF is missing: {histogram_pdf_path}")
 
     train_counter = count_labels(task["train_ids"], sample_lookup)
     forget_counter = count_labels(task["forget_ids"], sample_lookup)
@@ -1421,25 +1822,26 @@ def verify_outputs(
                 )
 
             for expected_task, actual_task in zip(expected_task_manifests, actual_task_manifests):
-                expected_artifact_rel = expected_task["artifacts"]["histogram_svg"]
-                actual_artifact_rel = actual_task["artifacts"]["histogram_svg"]
-                if expected_artifact_rel != actual_artifact_rel:
-                    raise ValueError(
-                        f"Verification failed for {dataset}: artifact path mismatch "
-                        f"{expected_artifact_rel} != {actual_artifact_rel}"
-                    )
+                for artifact_name in ("histogram_svg", "histogram_pdf"):
+                    expected_artifact_rel = expected_task["artifacts"][artifact_name]
+                    actual_artifact_rel = actual_task["artifacts"][artifact_name]
+                    if expected_artifact_rel != actual_artifact_rel:
+                        raise ValueError(
+                            f"Verification failed for {dataset}: artifact path mismatch "
+                            f"{expected_artifact_rel} != {actual_artifact_rel}"
+                        )
 
-                expected_artifact_path = project_root / expected_artifact_rel
-                actual_artifact_path = temp_project_root / actual_artifact_rel
-                if not expected_artifact_path.exists():
-                    raise FileNotFoundError(f"Missing expected artifact: {expected_artifact_path}")
-                if not actual_artifact_path.exists():
-                    raise FileNotFoundError(f"Missing actual artifact: {actual_artifact_path}")
-                if expected_artifact_path.read_bytes() != actual_artifact_path.read_bytes():
-                    raise ValueError(
-                        f"Verification failed for {dataset}: artifact mismatch "
-                        f"for {expected_artifact_rel}"
-                    )
+                    expected_artifact_path = project_root / expected_artifact_rel
+                    actual_artifact_path = temp_project_root / actual_artifact_rel
+                    if not expected_artifact_path.exists():
+                        raise FileNotFoundError(f"Missing expected artifact: {expected_artifact_path}")
+                    if not actual_artifact_path.exists():
+                        raise FileNotFoundError(f"Missing actual artifact: {actual_artifact_path}")
+                    if expected_artifact_path.read_bytes() != actual_artifact_path.read_bytes():
+                        raise ValueError(
+                            f"Verification failed for {dataset}: artifact mismatch "
+                            f"for {expected_artifact_rel}"
+                        )
 
 
 def main() -> None:

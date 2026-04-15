@@ -9,7 +9,6 @@
 \usepackage{amsmath}
 \usepackage{graphicx}
 \providecommand{\IfPDFManagementActiveF}[1]{#1}
-\usepackage{svg}
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
 
@@ -113,6 +112,7 @@ Masked-Small-Gradients (MSG) [\cite{cadet2025}]
 \subsection{Kaggle Winner}
 
 \section{Description and justification of what we did}
+We mainly focused on unlearning for image class-classification tasks, since this is the most common setting for unlearning and the one that the NeurIPS 2023 Unlearning Competition focused on.
 \begin{figure}[htbp]
     \centering
     \resizebox{\textwidth}{!}{%
@@ -123,7 +123,9 @@ Masked-Small-Gradients (MSG) [\cite{cadet2025}]
         model/.style={rectangle, rounded corners, draw=black!70, minimum height=1.2cm, minimum width=1.8cm, align=center, text=white, font=\sffamily\bfseries\small},
         action/.style={diamond, aspect=1.5, draw=black!70, minimum width=1.5cm, align=center, font=\sffamily\scriptsize},
         note/.style={rectangle, rounded corners, draw=gray!70, fill=gray!10, minimum height=0.7cm, minimum width=1.7cm, align=center, font=\sffamily\scriptsize},
-        metric/.style={rectangle, draw=gray!80, fill=gray!70, text=white, minimum height=0.6cm, minimum width=3.8cm, align=center, font=\sffamily\scriptsize\bfseries},
+        % --- UPDATED METRIC STYLE FOR HIGHER VISIBILITY ---
+        metric/.style={rectangle, draw=orange!80!black, fill=orange!15, text=black, minimum height=0.6cm, minimum width=3.8cm, align=center, font=\sffamily\scriptsize\bfseries},
+        % --------------------------------------------------
         box/.style={rectangle, draw=gray!60, thick, rounded corners=10pt, minimum height=6.2cm, inner sep=12pt},
         hdr/.style={rectangle, align=center, fill=white, font=\sffamily\scriptsize\bfseries, text=black!80},
         circ/.style={circle, draw=black!80, font=\sffamily\large\bfseries, inner sep=2pt, minimum size=0.6cm, fill=gray!10},
@@ -141,18 +143,16 @@ Masked-Small-Gradients (MSG) [\cite{cadet2025}]
         \begin{scope}[local bounding box=phase1_inner]
             \path (0, 2.9) -- (0, -2.9);
 
-            \node[db, fill=gray!15, minimum height=2.4cm, minimum width=1.5cm] (task_main) at (0,0) {Dataset\\Task};
+            \node[db, fill=gray!15, minimum height=2.4cm, minimum width=1.5cm] (task_main) at (0,0) {Complete\\Dataset};
 
             \coordinate (d_top) at ($(task_main.center) + (0.9, 1.2)$);
             \coordinate (d_bot) at ($(task_main.center) + (0.9, -1.2)$);
-            \draw[decorate,decoration={brace,amplitude=4pt}] (d_top) -- (d_bot);
 
             \node[db, colTrain]       (db_train1)   at (2.1,  1.25) {Train};
             \node[db, colVal]         (db_val1)     at (2.1,  0.00) {Val.};
             \node[db, colTest]        (db_test1)    at (2.1, -1.25) {Test};
             \node[db, colForget]      (db_forget1)  at (4.3,  1.85) {Forget};
             \node[db, colRetrainData] (db_retrain1) at (4.3,  0.65) {Retrain};
-            \node[note, minimum width=2.0cm] (db_train_note) at (4.3, -0.70) {Train =\\Retrain + Forget};
 
             \draw[->] (task_main.east) -- ++(0.45,0) |- (db_train1.west);
             \draw[->] (task_main.east) -- ++(0.45,0) -- (db_val1.west);
@@ -160,126 +160,145 @@ Masked-Small-Gradients (MSG) [\cite{cadet2025}]
             \draw[->] (db_train1.east) -- ++(0.50,0) |- (db_forget1.west);
             \draw[->] (db_train1.east) -- ++(0.50,0) |- (db_retrain1.west);
 
-            \coordinate (s_top) at ($(db_train1.center) + (0.7, 0.4)$);
-            \coordinate (s_bot) at ($(db_test1.center) + (0.7, -0.4)$);
-            \draw[decorate,decoration={brace,amplitude=4pt}] (s_top) -- (s_bot) 
-                node[midway, right=0.15cm, align=center, font=\sffamily\bfseries] {Task\\splits};
 
-            \coordinate (t_top) at ($(db_forget1.center) + (0.7, 0.4)$);
-            \coordinate (t_bot) at ($(db_retrain1.center) + (0.7, -0.4)$);
-            \draw[decorate,decoration={brace,amplitude=4pt}] (t_top) -- (t_bot)
-                node[midway, right=0.15cm, align=center, font=\sffamily\bfseries] {Train\\partition};
         \end{scope}
 
         \node[box, fit=(phase1_inner)] (box1) {};
-        \node[hdr, above=0.1cm of box1] (hdr1) {Task Definition};
+        \node[hdr, above=0.1cm of box1] (hdr1) {Dataset Split};
         \node[circ, above=0.1cm of hdr1] {1};
 
 
-        \begin{scope}[shift={(box1.east)}, xshift=0.4cm, local bounding box=phase2_inner]
-            \path (0, 2.9) -- (0, -2.9);
+\begin{scope}[shift={(box1.east)}, xshift=0.4cm, local bounding box=phase2_inner]
+    \path (0, 2.9) -- (0, -2.9);
 
-            \node[db, colTrain] (p2_train_search) at (0.7,  1.75) {Train};
-            \node[db, colVal]   (p2_val_search)   at (0.7,  0.80) {Val.};
-            \coordinate (p2_s_top) at ($(p2_train_search.center) + (0.75, 0.4)$);
-            \coordinate (p2_s_bot) at ($(p2_val_search.center) + (0.75, -0.4)$);
-            \draw[decorate,decoration={brace,amplitude=4pt}] (p2_s_top) -- (p2_s_bot)
-                node[midway, right=0.15cm, align=center, font=\sffamily\bfseries] {Select on\\validation};
+    % --- 1. Grid Search Phase ---
+    \node[db, colTrain] (p2_train_search) at (0.7,  1.85) {Train};
+    \node[db, colVal]   (p2_val_search)   at (0.7,  0.75) {Val.};
+    \coordinate (p2_s_top) at ($(p2_train_search.center) + (0.75, 0.4)$);
+    \coordinate (p2_s_bot) at ($(p2_val_search.center) + (0.75, -0.4)$);
+    
+    \draw[decorate,decoration={brace,amplitude=4pt}] (p2_s_top) -- (p2_s_bot)
+        node[midway, right=0.15cm, align=center, font=\sffamily\bfseries] {};
 
-            \node[action, fill=gray!15] (p2_search) at (2.5, 1.28) {Grid\\Search};
-            \node[note] (p2_cfg) at (4.5, 1.28) {Best\\Config};
-            \draw[->] ($(p2_s_top)!0.5!(p2_s_bot) + (0.05, 0)$) -- (p2_search);
-            \draw[->] (p2_search) -- (p2_cfg);
+    \node[draw, thick, rounded corners, fill=gray!10, align=center, minimum height=1cm] 
+        (p2_search) at (4.5, 1.30) {Hyperparameter\\Grid Search};
+    
+    \draw[->, thick] ($(p2_s_top)!0.5!(p2_s_bot) + (0.15, 0)$) -- (p2_search.west);
 
-            \node[db, colTrain]       (p2_train_run)   at (0.9, -0.40) {Train};
-            \node[model, colOrig, minimum width=2.5cm] (p2_train_bank) at (4.5, -0.40) {baseline\_train\\Bank (N = 3)};
-            \draw[->] (p2_train_run.east) -- (p2_train_bank.west);
+    \node[note] (p2_cfg) at (7.3, 1.30) {Best Config\\($\lambda, \eta, ...$)};
+    \draw[->, thick] (p2_search.east) -- (p2_cfg.west);
 
-            \node[db, colRetrainData] (p2_retrain_run) at (0.9, -1.95) {Retrain};
-            \node[model, colRetrain, minimum width=2.5cm] (p2_retrain_bank) at (4.5, -1.95) {baseline\_retrain\\Reference (N = 3)};
-            \draw[->] (p2_retrain_run.east) -- (p2_retrain_bank.west);
 
-            \coordinate (p2_cfg_split) at ($(p2_cfg.south) + (0, -0.35)$);
-            \draw[->] (p2_cfg.south) -- (p2_cfg_split);
-            \draw[->] (p2_cfg_split) -| (p2_train_bank.north);
-            \draw[->] (p2_cfg_split) -| (p2_retrain_bank.north);
-            \node[font=\sffamily\tiny, align=center] at ($(p2_retrain_bank.north) + (0, 0.32)$) {reuse\\best config};
-        \end{scope}
+
+    % --- 2. Final Training Phase ---
+    \node[db, colTrain] (p2_train_run) at (3.9, -0.40) {Train};
+    \node[model, colOrig, minimum width=2.5cm] (p2_train_bank) at (7.5, -0.40) {Train model\\Bank (N = 3)};
+    \draw[->, thick] (p2_train_run.east) -- (p2_train_bank.west);
+
+    \node[db, colRetrainData] (p2_retrain_run) at (3.9, -1.95) {Retrain};
+    \node[model, colRetrain, minimum width=2.5cm] (p2_retrain_bank) at (7.5, -1.95) {Retrain model\\Bank (N = 3)};
+    \draw[->, thick] (p2_retrain_run.east) -- (p2_retrain_bank.west);
+
+    \coordinate (p2_r_top) at ($(p2_train_run.center) - (0.75, -0.4)$);
+    \coordinate (p2_t_bot) at ($(p2_retrain_run.center) - (0.75, +0.4)$);
+
+    % 1. Changed order to (p2_t_bot) -- (p2_r_top) to make it a left-facing brace
+    % 2. Added a coordinate 'p2_brace_mid' to the node for the arrow to target
+    \draw[decorate,decoration={brace,amplitude=4pt}] (p2_t_bot) -- (p2_r_top)
+        node[midway, left=0.15cm] (p2_brace_mid) {};
+        
+    % 3. Draw a zig-zag arrow from Best Config to the brace
+    \draw[->, thick, dashed] (p2_cfg.south) 
+        -- ++(0, -0.3)                                 % 1. Small drop down
+        -| ($(p2_brace_mid) + (-0.8, 0)$)              % 2. Move LEFT past the brace
+        |- (p2_brace_mid.west);                        % 3. Move DOWN and RIGHT into the tip
+\end{scope}
 
         \node[box, fit=(phase2_inner)] (box2) {};
-        \node[hdr, above=0.1cm of box2] (hdr2) {Baseline Training\\[0.5ex] \normalfont\tiny One search, reused config, 3 shared seeds};
+        \node[hdr, above=0.1cm of box2] (hdr2) {Baseline Training\\[0.5ex] \normalfont\tiny One search, reused config, 3 seeds};
         \node[circ, above=0.1cm of hdr2] {2};
 
 
-        \begin{scope}[shift={(box2.east)}, xshift=0.4cm, local bounding box=phase3_inner]
-            \path (0, 2.9) -- (0, -2.9);
 
-            \node[model, colOrig, minimum width=2.4cm] (p3_base) at (1.2,  1.30) {baseline\_train\\Bank};
-            \node[db, colForget] (p3_forget) at (1.2, 0.00) {Forget};
-            \node[model, colRetrain, minimum width=2.4cm] (p3_ref) at (1.2, -1.55) {Retrained\\Runtime};
+\begin{scope}[shift={(box2.east)}, xshift=0.4cm, local bounding box=phase3_inner]
+        \path (0, 2.9) -- (0, -2.9);
 
-            \node[action, fill=violet!50, text=white, font=\sffamily\scriptsize\bfseries] (p3_select) at (4.1, 0.20) {Variant\\Selection};
-            \node[note] (p3_budget) at (4.1, -1.75) {seed 0 only\\budget $0.2\,t_R$};
-            \node[action, fill=gray!15] (p3_run) at (6.5, 0.20) {Run Chosen\\Profile};
-            \node[model, colUnlearn, minimum width=2.5cm] (p3_candidate) at (9.1, 0.20) {Candidate\\Family Bank};
+        % --- 1. Inputs (Aligned vertically) ---
+        \node[model, colOrig, minimum width=2.5cm] (p3_base) at (1.5, 1.30) {Train model\\Bank};
+        \node[db, colForget] (p3_forget) at (1.85, -1.30) {Forget Set};
 
-            \draw[->] (p3_base.east) -- ++(0.55,0) |- (p3_select.north west);
-            \draw[->] (p3_forget.east) -- ++(0.90,0) -- (p3_select.west);
-            \draw[->] (p3_ref.east) -- ++(0.55,0) |- (p3_select.south west);
-            \draw[->] (p3_select) -- (p3_run);
-            \draw[->] (p3_run) -- (p3_candidate);
-        \end{scope}
+        % --- 2. Positioning the Brace ---
+        % We define coordinates to the right of the input nodes
+        \coordinate (p3_brace_top) at ($(p3_base.east) + (0.3, 0.4)$);
+        \coordinate (p3_brace_bot) at ($(p3_forget.east) + (0.3, -0.4)$);
+
+        % Draw the right-facing brace (Top to Bottom path = Right-facing)
+        \draw[decorate, decoration={brace, amplitude=8pt, raise=2pt}, thick] 
+            (p3_brace_top) -- (p3_brace_bot)
+            node[midway, xshift=0.6cm] (p3_brace_tip) {};
+
+        % --- 3. Process & Output (Centered to the brace tip) ---
+        % Y-coordinate 0.65 is exactly between 1.3 and 0.0
+        \node[action, fill=gray!15, minimum height=1cm] (p3_run) at (6.0, 0) {Run Unlearning\\Algorithm};
+        
+        \node[model, colUnlearn, minimum width=2.5cm] (p3_candidate) at (9.2, 0) {Unlearned\\model Bank};
+
+        % --- 4. Final Arrows ---
+        % From brace tip to algorithm
+        \coordinate (p3_top) at ($(p3_brace_tip.center) - (0.25, 0)$);
+        \draw[->, thick] (p3_top) -- (p3_run.west);
+        
+        % From algorithm to candidate
+        \draw[->, thick] (p3_run.east) -- (p3_candidate.west);
+
+    \end{scope}
 
         \node[box, fit=(phase3_inner)] (box3) {};
-        \node[hdr, above=0.1cm of box3] (hdr3) {Approximate Unlearning\\[0.5ex] \normalfont\tiny Select on seed 0, then execute on the 3-seed bank};
+        \node[hdr, above=0.1cm of box3] (hdr3) {Run Unlearning\\[0.5ex] \normalfont\tiny on all 3 model bank};
         \node[circ, above=0.1cm of hdr3] {3};
 
 
-        \begin{scope}[shift={(box3.east)}, xshift=0.4cm, local bounding box=phase4_inner]
+\begin{scope}[shift={(box3.east)}, xshift=0.4cm, local bounding box=phase4_inner]
             \path (0, 2.9) -- (0, -2.9);
 
             \node[db, colRetain] (p4_retain) at (0.6,  1.85) {Retain};
-            \node[db, colTest]   (p4_test)   at (0.6,  0.65) {Test};
-            \node[db, colForget] (p4_forget) at (0.6, -0.55) {Forget};
+            \node[db, colTest]   (p4_test)   at (0.6,  0) {Test};
+            \node[db, colForget] (p4_forget) at (0.6, -1.85) {Forget};
 
-            \node[model, colUnlearn, minimum width=2.5cm] (p4_candidate) at (2.9,  0.95) {Candidate\\Family};
-            \node[model, colRetrain, minimum width=2.5cm] (p4_reference) at (2.9, -1.15) {baseline\_retrain};
-            \node[note, minimum width=2.4cm, minimum height=1.8cm] (p4_compare) at (5.3, -0.10) {Benchmark\\candidate vs\\reference};
+            \node[model, colUnlearn, minimum width=2.5cm] (p4_candidate) at (2.9,  0.95) {Unlearned model\\Bank};
+            \node[model, colRetrain, minimum width=2.5cm] (p4_reference) at (2.9, -1.15) {Retrained model\\ Bank};
 
-            \draw[->] (p4_retain.east) -- ++(0.55,0) |- (p4_compare.north west);
-            \draw[->] (p4_test.east) -- ++(0.85,0) -- (p4_compare.west);
-            \draw[->] (p4_forget.east) -- ++(0.55,0) |- (p4_compare.south west);
-            \draw[->] (p4_candidate.east) -- ++(0.40,0) |- (p4_compare.north);
-            \draw[->] (p4_reference.east) -- ++(0.40,0) |- (p4_compare.south);
+            % 1. Place the first node at a fixed coordinate
+            \node[metric, text width=3.5cm, align=left] (m1) at (7.6,  1.85) {\textbf{(1)} Forget quality: $\epsilon^s \rightarrow \mathcal{F}$};
+            
+            % 2. Chain the rest of the nodes using 'below=0.2cm of ...' for perfectly equal gaps
+            \node[metric, text width=3.5cm, align=left, below=0.2cm of m1] (m2) {\textbf{(2)} Retain Ratio: $RA^U/RA^R$};
+            \node[metric, text width=3.5cm, align=left, below=0.2cm of m2] (m3) {\textbf{(3)} Test Ratio: $TA^U/TA^R$};
+            \node[metric, text width=3.5cm, align=left, below=0.2cm of m3] (m4) {\textbf{(4)} Runtime Threshold: $t_{Unlearn} \leq 0.2\,t_{Retrain}$};
+            \node[metric, text width=3.5cm, align=left, below=0.2cm of m4] (m5) {\textbf{(5)} If pass Threshold, Final Score : $\mathcal{F} \times \frac{RA^U}{RA^R} \times \frac{TA^U}{TA^R}$};
 
-            \node[metric] (m1) at (8.6,  1.85) {Forget conf.\ $\rightarrow\ \epsilon^s\ \rightarrow\ \mathcal{F}$};
-            \node[metric] (m2) at (8.6,  0.95) {Retain Ratio:\ $RA^U/RA^R$};
-            \node[metric] (m3) at (8.6,  0.05) {Test Ratio:\ $TA^U/TA^R$};
-            \node[metric] (m4) at (8.6, -0.85) {Runtime Gate:\ $t_U \leq 0.2\,t_R$};
-            \node[metric] (m5) at (8.6, -1.75) {Final Score if gate passes};
+            \coordinate (m_left_top) at (4.55, 2.15);
+            \coordinate (m_left_bot) at (4.55, -2.05);
+            
+            % 3. Added 'thick' (you can also use 'very thick' or 'line width=1.5pt' for even more weight)
+            \draw[thick, decorate,decoration={brace,amplitude=5pt}] (m_left_top) -- (m_left_bot) coordinate[midway] (p4_metric_mid);
 
-            \coordinate (m_left_top) at (6.55, 2.15);
-            \coordinate (m_left_bot) at (6.55, -2.05);
-            \draw[decorate,decoration={brace,amplitude=5pt,mirror}] (m_left_top) -- (m_left_bot) coordinate[midway] (p4_metric_mid);
-            \draw[->] (p4_compare.east) -- (p4_metric_mid);
         \end{scope}
 
         \node[box, fit=(phase4_inner)] (box4) {};
-        \node[hdr, above=0.1cm of box4] (hdr4) {Benchmark Scoring\\[0.5ex] \normalfont\tiny Compare candidate families to the retrained reference};
+        \node[hdr, above=0.1cm of box4] (hdr4) {Benchmark Scoring\\[0.5ex] \normalfont\tiny};
         \node[circ, above=0.1cm of hdr4] {4};
 
     \end{tikzpicture}%
     }
-    \caption{Pipeline used for each dataset-task benchmark. Phase 1 constructs a manifest-defined task with named \texttt{train}, \texttt{val}, and \texttt{test} splits, where the canonical \texttt{train} split is further partitioned as \texttt{train} $=$ \texttt{retrain} $+$ \texttt{forget}. Phase 2 runs one small validation-based grid search on the \texttt{train} split, keeps the best configuration, and reuses it to train matched \texttt{baseline\_train} and \texttt{baseline\_retrain} seed banks over the same three random initializations. Phase 3 applies each approximate unlearning family starting from \texttt{baseline\_train}; when efficiency-aware execution is enabled, a reduced variant is selected on the first seed under the runtime budget $0.2\,t_R$ derived from the retrained reference, and the selected profile is then run across the full three-seed bank. Phase 4 benchmarks \texttt{baseline\_train} and each unlearning family against \texttt{baseline\_retrain} on the retain, test, and forget splits, computing forgetting quality from per-example epsilons and combining it with retain and test accuracy ratios, with the final score kept only if the runtime cutoff is satisfied.}
-    \label{fig:pipeline}
+    \caption{Benchmark pipeline for each dataset-task pair. Phase 1 splits the task into \texttt{train}, \texttt{val}, and \texttt{test}, with \texttt{train} further divided into \texttt{forget} and \texttt{retrain}. Phase 2 runs one grid search and reuses the best configuration to build matched Train model and Retrain model banks over three seeds. Phase 3 runs each unlearning method from the Train model bank and Forget set. Phase 4 compares the Unlearned model bank against the Retrain model bank on the retain, test, and forget splits, with the final score kept only when $t_{Unlearn} \leq 0.2\,t_{Retrain}$.}
+\label{fig:pipeline}
 \end{figure}
 
-Figure~\ref{fig:pipeline} summarizes the benchmark pipeline we implemented. Each experiment begins from a manifest-defined task with \texttt{train}, \texttt{val}, and \texttt{test} splits, where \texttt{train} is explicitly partitioned into the disjoint \texttt{forget} and \texttt{retrain} subsets. For a given dataset, we run one small validation-based grid search on \texttt{train}, keep the best configuration, and then reuse that same configuration to build two matched three-seed banks: \texttt{baseline\_train}, trained on \texttt{train}, and \texttt{baseline\_retrain}, trained from scratch on \texttt{retrain} and used as the reference family.
-
-This design keeps the comparison controlled and practical. Every approximate unlearning method starts from the same \texttt{baseline\_train} checkpoints and the same \texttt{forget} split, and the efficiency-aware selection step uses one seed to choose a variant that respects the retraining budget before the selected profile is executed across all three seeds. We then score \texttt{baseline\_train} and every unlearning family against \texttt{baseline\_retrain} using the implemented product $\mathcal{F} \times \frac{RA^U}{RA^R} \times \frac{TA^U}{TA^R}$, while only keeping that score when the runtime condition $t_U \leq 0.2\,t_R$ holds.
+Figure~\ref{fig:pipeline} summarizes our benchmark pipeline. For each dataset, we first construct deterministic \texttt{train}, \texttt{val}, \texttt{test}, \texttt{forget}, and \texttt{retrain} splits to prevent data leakage between tuning and evaluation. We then run a single hyperparameter grid search for ResNet-18 (no-pretrained weights), reuse the selected configuration for both the Train and Retrain model banks, and evaluate each setting over matched three-seed runs. This design keeps the comparison fair by avoiding extra tuning for either bank, reduces variance from random initialization, and provides a clean retrained reference trained only on \texttt{retrain} against which approximate unlearning methods can be judged.
 
 \section{Experiment Setup}
-In our experiments, we benchmark several approximate machine unlearning algorithms against a gold-standard baseline (retraining from scratch). For our base architecture, we utilize a randomly initialized ResNet-18 model with no pre-trained weights. To ensure optimal performance, we independently tune hyperparameters for each dataset via a small grid search on a dedicated validation set. Full details of this tuning process can be found in \Cref{fig:hyperparameterTuning}.
+In our experiments, we benchmark several approximate machine unlearning algorithms against a gold-standard baseline (retraining from scratch). For our base architecture, we utilize a ResNet-18 model with no pre-trained weights. To ensure optimal performance, we independently tune hyperparameters for each dataset via a small grid search on a dedicated validation set. Full details of this tuning process can be found in \Cref{fig:hyperparameterTuning}.
 
 % To accommodate smaller image resolutions without suffering from spatial detail collapse, the ResNet-18 stem is modified for $32 \times 32$ inputs by replacing the initial $7 \times 7$ convolution with a $3 \times 3$ kernel and swapping the max-pooling layer with an identity mapping. For larger inputs, the standard ResNet-18 stem is preserved.
 
@@ -294,41 +313,6 @@ For the unlearning task, the canonical training partition is deterministically d
 \end{enumerate}
 
 Held-out validation and test sets are strictly maintained to measure generalization during unlearning.
-
-\begin{figure}[htbp]
-    \centering
-    \begin{tikzpicture}[
-        node distance=0.4cm and 1.5cm,
-        box/.style={draw, rectangle, rounded corners, align=center, minimum width=2.4cm, minimum height=0.8cm, font=\sffamily\footnotesize},
-        arrow/.style={->, >=stealth, thick, rounded corners=2pt}
-    ]
-
-    % Top Level Dataset
-    \node[box] (dataset) {Total Dataset};
-
-    % Level 1: Direct 3-way split
-    \node[box] (val) [right=1.2cm of dataset] {Validation Set};
-    \node[box] (test) [above=0.3cm of val] {Test Set};
-    \node[box] (train) [below=0.3cm of val] {Train Set};
-
-    % Level 2: Unlearning splits from Train
-    \node[box] (forget) [above right=0.1cm and 1.2cm of train] {Forget Set};
-    \node[box] (retrain) [below right=0.1cm and 1.2cm of train] {Retrain Set};
-
-    % Edges from Total Dataset
-    \draw [arrow] (dataset.east) -- +(0.4,0) |- (test.west);
-    \draw [arrow] (dataset.east) -- (val.west);
-    \draw [arrow] (dataset.east) -- +(0.4,0) |- (train.west);
-
-    % Edges from Train Set
-    \draw [arrow] (train.east) -- +(0.4,0) |- (forget.west);
-    \draw [arrow] (train.east) -- +(0.4,0) |- (retrain.west);
-
-    \end{tikzpicture}
-    \vspace{-0.5em}
-    \caption{Data partitioning pipeline for unlearning tasks. The dataset is first divided into test, validation, and training sets. The training data is further partitioned into a \textit{forget set} (target samples to be unlearned) and a disjoint \textit{retrain set} (used to train clean baseline models from scratch).}
-    \label{fig:dataset_splits}
-\end{figure}
 
 \subsection{Evaluation}
 To strictly evaluate the qualitative performance of the approximate unlearning methods, we utilize an extensive benchmark pipeline that directly follows the \textbf{NeurIPS 2023 Machine Unlearning Competition} methodology \citep{neurips-2023-machine-unlearning}.
@@ -378,7 +362,7 @@ This final formulation scales the forgetting quality $\mathcal{F}$ by the utilit
 
 \section{Discussion and future work}
 
-The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the \texttt{baseline\_train} family still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable, because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
+The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the Train model bank, which is trained on the full training split rather than produced by an unlearning method, still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable, because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
 
 \begin{figure}[htbp]
     \centering
@@ -402,6 +386,24 @@ Several limitations of our current study point directly to future work. We only 
 \section{Supplementary material} \label{app:info}
 
 This stuff doesn't count towards your page limit.
+
+\subsection{Forget-task distributions}
+
+The task is not class-uniform. Instead, it deterministically selects the most frequent labels in the canonical training split and removes a fixed fraction of those examples into the forget set. On CIFAR-10, where the training split is class-balanced, this produces a clean targeted deletion task: $4{,}500$ training examples are forgotten in total, with $1{,}500$ examples each from \texttt{airplane}, \texttt{automobile}, and \texttt{bird}, while the remaining seven classes are left entirely in the retrain split. On MUFAC, the base dataset is already imbalanced, so the same \texttt{forget\_mixed} construction yields a visibly skewed forgetting task: $822$ examples are forgotten in total, concentrated in classes \texttt{a}, \texttt{b}, and \texttt{c} with counts $293$, $273$, and $256$, respectively. These plots help explain why forgetting difficulty and utility preservation need not look the same across datasets: the unlearning target is balanced and structured on CIFAR-10, but inherits MUFAC's long-tailed label distribution.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/cifar10_forget_mixed_histograms.pdf}
+    \caption{Class distributions for the CIFAR-10 \texttt{forget\_mixed} task. Left: the canonical train, validation, and test splits. Right: the retrain/forget partition induced by the forgetting task, which removes only \texttt{airplane}, \texttt{automobile}, and \texttt{bird} examples.}
+    \label{fig:cifarForgetMixedHist}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/mufac_forget_mixed_histograms.pdf}
+    \caption{Class distributions for the MUFAC \texttt{forget\_mixed} task. Left: the canonical train, validation, and test splits. Right: the retrain/forget partition, where the forget set is concentrated in the most frequent classes and therefore reflects MUFAC's underlying imbalance.}
+    \label{fig:mufacForgetMixedHist}
+\end{figure}
 
 \begin{figure}[htbp]
     \centering
