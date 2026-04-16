@@ -35,3 +35,7 @@ checkpoints/
 __pycache__/
 *.py[cod]
 **/outdir/**
+
+# Ignoring some
+!Report/figures/cifar10_forget_mixed_histograms.pdf
+!Report/figures/mufac_forget_mixed_histograms.pdf
