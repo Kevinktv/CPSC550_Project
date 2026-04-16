@@ -417,19 +417,19 @@ In future work, we plan to expand our benchmark to include more datasets, differ
 
 The task is not class-uniform. Instead, it deterministically selects the most frequent labels in the canonical training split and removes a fixed fraction of those examples into the forget set. On CIFAR-10, where the training split is class-balanced, this produces a clean targeted deletion task: $4{,}500$ training examples are forgotten in total, with $1{,}500$ examples each from \texttt{airplane}, \texttt{automobile}, and \texttt{bird}, while the remaining seven classes are left entirely in the retrain split. On MUFAC, the base dataset is already imbalanced, so the same \texttt{forget\_mixed} construction yields a visibly skewed forgetting task: $822$ examples are forgotten in total, concentrated in classes \texttt{a}, \texttt{b}, and \texttt{c} with counts $293$, $273$, and $256$, respectively. These plots help explain why forgetting difficulty and utility preservation need not look the same across datasets: the unlearning target is balanced and structured on CIFAR-10, but inherits MUFAC's long-tailed label distribution.
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=1\linewidth]{figures/cifar10_forget_mixed_histograms.pdf}
-%     \caption{Class distributions for the CIFAR-10 \texttt{forget\_mixed} task. Left: the canonical train, validation, and test splits. Right: the retrain/forget partition induced by the forgetting task, which removes only \texttt{airplane}, \texttt{automobile}, and \texttt{bird} examples.}
-%     \label{fig:cifarForgetMixedHist}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/cifar10_forget_mixed_histograms.pdf}
+    \caption{Class distributions for the CIFAR-10 \texttt{forget\_mixed} task. Left: the canonical train, validation, and test splits. Right: the retrain/forget partition induced by the forgetting task, which removes only \texttt{airplane}, \texttt{automobile}, and \texttt{bird} examples.}
+    \label{fig:cifarForgetMixedHist}
+\end{figure}
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=1\linewidth]{figures/mufac_forget_mixed_histograms.pdf}
-%     \caption{Class distributions for the MUFAC \texttt{forget\_mixed} task. Left: the canonical train, validation, and test splits. Right: the retrain/forget partition, where the forget set is concentrated in the most frequent classes and therefore reflects MUFAC's underlying imbalance.}
-%     \label{fig:mufacForgetMixedHist}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/mufac_forget_mixed_histograms.pdf}
+    \caption{Class distributions for the MUFAC \texttt{forget\_mixed} task. Left: the canonical train, validation, and test splits. Right: the retrain/forget partition, where the forget set is concentrated in the most frequent classes and therefore reflects MUFAC's underlying imbalance.}
+    \label{fig:mufacForgetMixedHist}
+\end{figure}
 
 \begin{figure}[htbp]
     \centering
@@ -444,5 +444,49 @@ The task is not class-uniform. Instead, it deterministically selects the most fr
     \caption{MUFAC Hyperparmeter tuning for Resnet18}
     \label{fig:hyperparameterTuning2}
 \end{figure}
+
+\subsection{Benchmark result tables}
+
+\begin{table*}[htbp]
+    \centering
+    \small
+    \caption{Appendix benchmark summary for CIFAR-10. Final Score is shown as N/A when the runtime efficiency threshold is not passed.}
+    \label{tab:appendixBenchmarkCifar10}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        Method & Forgetting Quality & Retain Accuracy & Test Accuracy & Retain Ratio & Test Ratio & Pass Threshold & Final Score \\
+        \midrule
+        Train baseline & 0.2084 & 1.0000 & 0.8403 & 1.0000 & 1.0171 & No & N/A \\
+        MSG & 0.2734 & 0.9994 & 0.8000 & 0.9994 & 0.9682 & Yes & 0.2646 \\
+        Fanchuan & 0.0659 & 0.9999 & 0.8360 & 0.9999 & 1.0119 & Yes & 0.0667 \\
+        SCRUB & 0.0586 & 0.4894 & 0.4697 & 0.4894 & 0.5685 & Yes & 0.0163 \\
+        CT & 0.0568 & 0.7485 & 0.6983 & 0.7485 & 0.8452 & Yes & 0.0359 \\
+        DELETE & 0.0537 & 0.7984 & 0.6145 & 0.7984 & 0.7438 & Yes & 0.0319 \\
+        \bottomrule
+    \end{tabular}%
+    }
+\end{table*}
+
+\begin{table*}[htbp]
+    \centering
+    \small
+    \caption{Appendix benchmark summary for MUFAC. Final Score is shown as N/A when the runtime efficiency threshold is not passed.}
+    \label{tab:appendixBenchmarkMufac}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        Method & Forgetting Quality & Retain Accuracy & Test Accuracy & Retain Ratio & Test Ratio & Pass Threshold & Final Score \\
+        \midrule
+        Train baseline & 0.0809 & 1.0000 & 0.4618 & 1.0000 & 1.0509 & No & N/A \\
+        MSG & 0.2762 & 0.9884 & 0.4416 & 0.9884 & 1.0047 & Yes & 0.2742 \\
+        Fanchuan & 0.1198 & 0.9995 & 0.4180 & 0.9995 & 0.9512 & Yes & 0.1139 \\
+        SCRUB & 0.2135 & 0.6265 & 0.5000 & 0.6265 & 1.1377 & Yes & 0.1522 \\
+        CT & 0.1363 & 0.4945 & 0.3226 & 0.4945 & 0.7341 & Yes & 0.0495 \\
+        DELETE & 0.1466 & 0.7889 & 0.2525 & 0.7889 & 0.5746 & Yes & 0.0665 \\
+        \bottomrule
+    \end{tabular}%
+    }
+\end{table*}
 
  \end{document}
