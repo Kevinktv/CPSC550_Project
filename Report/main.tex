@@ -54,7 +54,7 @@
 \newtheorem{assumption}{Assumption}
 
 
-\title{Benchmark on Vision Unlearning}
+\title{Benchmark and Survey on Vision Unlearning}
 
 
 % The \author macro works with any number of authors. There are two commands
@@ -76,8 +76,9 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-    In this report, we conduct a survey and benchmark comparison of several approximate machine unlearning algorithms against a retraining baseline. We evaluate the methods on two image classification datasets, CIFAR-10 and MUFAC, using an evaluation protocol inspired by the NeurIPS 2023 Machine Unlearning Competition. 
-    We evaluate four unlearning methods: Masked-Small-Gradients (MSG), SCRUB, DELETE, and the 2023 Kaggle 2nd place winner. \textcolor{red}{todo: clean abstract later}
+In this report, we present a survey and empirical benchmark of several approximate machine unlearning algorithms against a retraining baseline. We evaluate these methods on two image classification datasets, CIFAR-10 and MUFAC, using an evaluation protocol inspired by the \cite{neurips-2023-machine-unlearning}. 
+
+Specifically, we consider four algorithms: SCRUB, DELETE, the 2023 Kaggle first-place solution (Fanchuan), and the 2023 Kaggle second-place solution (MSG). Our study provides a comparative analysis of their performance in terms of forgetting quality, utility retention, and computational efficiency.
 \end{abstract}
 
 \section{Introduction}
@@ -86,10 +87,11 @@ In 2023, California signed in the DELETE Act [\cite{delete_act}], which requires
 
 In an ideal world, the best way to unlearn data from a model is to retrain the model from scratch on the remaining data. This ensures that the model has no knowledge of the data that was removed. However, retraining can be computationally expensive and time-consuming, especially for large models and datasets. Therefore, there is a growing interest in developing efficient unlearning algorithms that can approximate the effect of a full retrain.
 
-This project aims to benchmark several recent approximate machine unlearning algorithms against a retraining baseline. We focus on image classification tasks, and will be focusing on the following unlearning algorithms: Masked-Small-Gradients (MSG) [\cite{cadet2025}], SCalable Remembering and Unlearning unBound (SCRUB) [\cite{kurmanji2023unboundedmachineunlearning}], DEcoupLEd Distillation To Erase (DELETE) [\cite{zhou2025decoupleddistillationerasegeneral}] and the 2023 Kaggle 2nd place winner [\cite{2023-winner}]. 
+This project aims to benchmark several recent approximate machine unlearning algorithms against a retraining baseline. We focus on image classification tasks, and will be focusing on the following unlearning algorithms: 
+SCalable Remembering and Unlearning unBound (SCRUB) [\cite{kurmanji2023unboundedmachineunlearning}], DEcoupLEd Distillation To Erase (DELETE) [\cite{zhou2025decoupleddistillationerasegeneral}], the 2023 Kaggle 1st place winner (Fanchuan) [\cite{2023-winner}], and the 2023 Kaggle 2nd place winner (MSG) [\cite{2023-second-place}] where the acronym MSG (Masked Small Gradients) follows the naming convention used in \citet{cadet2025}. 
 We evaluate these methods on two image classification datasets: CIFAR-10 [\cite{Krizhevsky09learningmultiple}] and MUFAC [\cite{choi2023machine}]. We use an evaluation metric inspired by the NeurIPS 2023 Machine Unlearning Competition, which combines measures of forgetting quality, utility retention, and runtime efficiency into a single score.
 
-\section{Related work}
+\section{Related Work}
 \textbf{Machine Unlearning.} In machine unlearning, our goal is to remove the influence of specific data points from a trained model \citep{bourtoule2021machine, zhang2023review}. There have been several approaches proposed for machine unlearning. \citet{cao2015towards} proposed a method of unlearning based on reformulating the learning algorithm into a summation based form and unlearning by subtracting contributions of specific summands. However, this approach requires that the learning algorithm be expressible in a summation form which is not feasible for most modern deep learning models. 
 \cite{bourtoule2021machine} proposed a method called SISA (Sharded, Isolated, Sliced, and Aggregated) training, which partitions the training data into shards and trains separate models on each shard. To unlearn a data point, only the model trained on the shard containing that data point needs to be retrained. However, as the number of shards increases, the performance of the model degrades. Recently, several new algorithms have been proposed that aim to achieve better performance while still being efficient and scalable \citep{cadet2025, kurmanji2023unboundedmachineunlearning, zhou2025decoupleddistillationerasegeneral}.
 
@@ -116,26 +118,46 @@ We base our problem setup on \cite{li2025overview}. We begin with some notation 
 \end{definition}
 Note that both $A$ and $U$ can be randomized algorithms that define a distribution over the hypothesis space $H$.
 
-Suppose we have a training dataset $D \in Z^*$ and a subset of data points $S \subseteq D$ that we wish to unlearn. Let $D' = D \setminus S$. The goal of machine unlearning is to create an unlearning algorithm $U$ such that the distribution of $U(A(D), D, S)$ is close to the distribution of $A(D')$ (i.e. retraining the original model on the smaller dataset).
+Suppose we have a training dataset $D \in Z^*$ and a subset of data points $S \subseteq D$ that we wish to unlearn (called the forget set). Let $D' = D \setminus S$ (called the retain set). The goal of machine unlearning is to create an unlearning algorithm $U$ such that the distribution of $U(A(D), D, S)$ is close to the distribution of $A(D')$ (i.e. retraining the original model on the smaller retain set).
 i.e.
 \begin{equation}
     \Pr[A(D')] \approx \Pr[U(A(D), D, S)]
 \end{equation} 
-Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. In this project, we use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition. \textcolor{red}{todo: add reference to description of evaluation protocol}
+Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. In this project, we use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition. Additional details about the evaluation protocol is described in \textcolor{red}{todo: add reference to description of evaluation protocol}
 
-\section{Unlearning algorithms and evaluation metrics}
+\section{Unlearning Algorithms and Evaluation Metric}
 Below, we briefly summarize the unlearning algorithms that we benchmarked in this project and provide background on the evaluation metrics we used to compare their performance.
-\subsection{Masked-Small-Gradients (MSG)}
-\textbf{Masked-Small-Gradients (MSG)} [\cite{cadet2025}]: 
 
 \subsection{SCRUB}
+\textbf{SCalable Remembering and Unlearning unBound (SCRUB)} [\cite{kurmanji2023unboundedmachineunlearning}]: 
 
 \subsection{DELETE}
 
-\subsection{Kaggle Winner}
+\subsection{Kaggle 2023 Winner}
+\textbf{Kaggle 2023 Winner (Fanchuan)} [\cite{2023-winner}]: Fanchuan is a two-stage unlearning algorithm. In the first stage, the algorithm minimizes the KL divergence of the models output on the forget set and a uniform distribution. This encourages the model to produce less confident predictions on the forget set. In the second stage, the algorithm performs adversial fine tuning using contrastive learning to push the forget samples away from the retain samples in the feature space. They simultaneously also reduce the cross entropy loss on the retain set to preserve performance on the retain set. 
 
-\section{Description and justification of what we did}
-We mainly focused on unlearning for image class-classification tasks, since this is the most common setting for unlearning and the one that the NeurIPS 2023 Unlearning Competition focused on.
+\subsection{Kaggle 2023 runner up (Masked-Small-Gradients)}
+\textbf{Masked-Small-Gradients (MSG)} [\cite{2023-second-place}]: In MSG, the unlearning process hinges on identifying weights in the model that influence both the forget set and the retain set and do not distinguish between them. The algorithm first computes the gradients of the loss with respect to the model parameters for both the forget set and the retain set. Weights with small gradient magnitudes indicate that the specific weight 
+does not help distinguish between the forget and retain sets. Hence, MSG reinitializes these weights, and then retrains these weights on the retain set while keeping the other weights fixed. This approach avoids a full retraining by only updating a subset of the model parameters that are deemed less important for distinguishing the forget set from the retain set.
+
+\section{Experimental Setup}
+Below, we describe our experimental setup, including the model architecture, dataset and training pipeline.
+
+\subsection{Model architecture and datasets}
+For our base architecture, we utilize a ResNet-18 model with no pre-trained weights. To ensure optimal performance, we independently tune hyperparameters for each dataset via a small grid search on a dedicated validation set. Full details of this tuning process can be found in \Cref{fig:hyperparameterTuning}. Details regarding the training pipeline can be found in \Cref{sec:training_pipeline}.
+
+We evaluate the unlearning algorithms across three primary image classification datasets: Kaggle Machine Unlearning Dataset \citep{neurips-2023-machine-unlearning}, CIFAR-10 \citep{Krizhevsky09learningmultiple}, MUFAC \citep{choi2023machine}.
+
+For the unlearning task, the training partition is divided into two mutually exclusive sets:
+\begin{enumerate}
+    \item \textbf{Forget Set ($S$):} A subset of the training data selected to be unlearned. Our generation pipeline builds a mixed-label unlearning task that proportionally targets specific classes or targets a globally defined forget percentage.
+    \item \textbf{Retain Set ($D \setminus S$):} The remaining data from the training partition, representing the data the model must preserve.
+\end{enumerate}
+
+Held-out validation and test sets are strictly maintained to measure generalization during unlearning.
+
+
+\subsection{Training pipeline}\label{sec:training_pipeline}
 \begin{figure}[htbp]
     \centering
     \resizebox{\textwidth}{!}{%
@@ -320,22 +342,8 @@ We mainly focused on unlearning for image class-classification tasks, since this
 
 Figure~\ref{fig:pipeline} summarizes our benchmark pipeline. For each dataset, we first construct deterministic \texttt{train}, \texttt{val}, \texttt{test}, \texttt{forget}, and \texttt{retrain} splits to prevent data leakage between tuning and evaluation. We then run a single hyperparameter grid search for ResNet-18 (no-pretrained weights), reuse the selected configuration for both the Train and Retrain model banks, and evaluate each setting over matched three-seed runs. This design keeps the comparison fair by avoiding extra tuning for either bank, reduces variance from random initialization, and provides a clean retrained reference trained only on \texttt{retrain} against which approximate unlearning methods can be judged.
 
-\section{Experiment Setup}
-In our experiments, we benchmark several approximate machine unlearning algorithms against a gold-standard baseline (retraining from scratch). For our base architecture, we utilize a ResNet-18 model with no pre-trained weights. To ensure optimal performance, we independently tune hyperparameters for each dataset via a small grid search on a dedicated validation set. Full details of this tuning process can be found in \Cref{fig:hyperparameterTuning}.
 
 % To accommodate smaller image resolutions without suffering from spatial detail collapse, the ResNet-18 stem is modified for $32 \times 32$ inputs by replacing the initial $7 \times 7$ convolution with a $3 \times 3$ kernel and swapping the max-pooling layer with an identity mapping. For larger inputs, the standard ResNet-18 stem is preserved.
-
-\subsection{Dataset}
-
-We evaluate the unlearning algorithms across three primary image classification datasets: Kaggle Machine Unlearning Dataset \citep{neurips-2023-machine-unlearning}, CIFAR-10 \citep{Krizhevsky09learningmultiple}, MUFAC \citep{choi2023machine}.
-
-For the unlearning task, the canonical training partition is deterministically divided into two mutually exclusive sets:
-\begin{enumerate}
-    \item \textbf{Forget Set ($S$):} A subset of the training data selected to be unlearned. Our generation pipeline builds a mixed-label unlearning task that proportionally targets specific classes or targets a globally defined forget percentage.
-    \item \textbf{Retain Set ($D \setminus S$):} The remaining data from the training partition, representing the data the model must preserve.
-\end{enumerate}
-
-Held-out validation and test sets are strictly maintained to measure generalization during unlearning.
 
 \subsection{Evaluation}
 To strictly evaluate the qualitative performance of the approximate unlearning methods, we utilize an extensive benchmark pipeline that directly follows the \textbf{NeurIPS 2023 Machine Unlearning Competition} methodology \citep{neurips-2023-machine-unlearning}.
@@ -394,7 +402,7 @@ The benchmark results show that \textbf{MSG} is the only method that remains com
     \label{fig:benchmarkTradeoffs}
 \end{figure}
 
-The remaining methods each expose a different failure mode. \textbf{FanchuanUnlearning} preserves utility almost perfectly, but its forgetting quality is too weak to compete, yielding final scores of only $0.0667$ on CIFAR-10 and $0.1139$ on MUFAC despite solid speedups. \textbf{SCRUB} is much more dataset-sensitive: it performs poorly on CIFAR-10, but on MUFAC it reaches the second-best final score ($0.1522$) and the highest test accuracy ($0.5000$), while still suffering a large retain-accuracy drop to $0.6265$. This makes SCRUB interesting, but unstable. At the other extreme, \textbf{CT} and \textbf{DELETE} are the fastest methods in the benchmark, reaching roughly $13\times$ to $45\times$ speedups, yet their retain and test accuracies fall too far below retraining to remain competitive on the final score. Taken together, these comparisons suggest that fast approximate unlearning is not enough by itself; the strongest methods are the ones that preserve utility while still producing a meaningful privacy-oriented forgetting signal.
+The remaining methods each expose a different failure mode. \textbf{Fanchuan} preserves utility almost perfectly, but its forgetting quality is too weak to compete, yielding final scores of only $0.0667$ on CIFAR-10 and $0.1139$ on MUFAC despite solid speedups. \textbf{SCRUB} is much more dataset-sensitive: it performs poorly on CIFAR-10, but on MUFAC it reaches the second-best final score ($0.1522$) and the highest test accuracy ($0.5000$), while still suffering a large retain-accuracy drop to $0.6265$. This makes SCRUB interesting, but unstable. At the other extreme, \textbf{CT} and \textbf{DELETE} are the fastest methods in the benchmark, reaching roughly $13\times$ to $45\times$ speedups, yet their retain and test accuracies fall too far below retraining to remain competitive on the final score. Taken together, these comparisons suggest that fast approximate unlearning is not enough by itself; the strongest methods are the ones that preserve utility while still producing a meaningful privacy-oriented forgetting signal.
 
 Several limitations of our current study point directly to future work. We only evaluate two datasets, one forget-task construction (\texttt{forget\_mixed}), and three models per family, so the robustness of the ranking is still limited. A natural next step is to test additional forget-set structures, such as class-specific, random, or long-tail deletion tasks, and to increase the number of seeds so that dataset-specific volatility can be measured more reliably. It would also be useful to retune each unlearning algorithm more aggressively rather than relying on a single shared experimental envelope, since methods like SCRUB appear especially sensitive to dataset characteristics. Finally, extending the benchmark beyond a randomly initialized ResNet-18 and complementing the hard runtime cutoff with Pareto-style or cost-aware analyses would give a more complete view of when a method is genuinely preferable to retraining.
 
