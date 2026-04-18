@@ -129,10 +129,14 @@ Of course, we do not have access to the true distributions so there are several 
 Below, we briefly summarize the unlearning algorithms that we benchmarked in this project and provide background on the evaluation metrics we used to compare their performance.
 
 \subsection{SCRUB}
-\textbf{SCalable Remembering and Unlearning unBound (SCRUB)} [\cite{kurmanji2023unboundedmachineunlearning}]: 
+\textbf{SCalable Remembering and Unlearning unBound (SCRUB)} [\cite{kurmanji2023unboundedmachineunlearning}]: SCRUB is an unlearning algorithm that utilizes a teacher-student framework. Initially, both the teacher and student models are initialized with the same set of weights. The goal is for the student to "obey" the teacher for the retain set and "disobey" the teacher for the forget set. 
+To achieve this, SCRUB uses a loss function that encourages the student to produce similar outputs to the teacher on the retain set, while producing different outputs on the forget set. The final component of the loss function is the loss on the retain set, which encourages the student to perform well on it. By optimizing this loss function, SCRUB effectively unlearns the forget set while retaining performance on the retain set.
 
 \subsection{DELETE}
+\textbf{DEcoupLEd Distillation To Erase (DELETE)} [\cite{zhou2025decoupleddistillationerasegeneral}]: DELETE is also an unlearning algorithm that is based on knowledge distillation/teacher-student framework. In the paper, they showed that the KL between the target probability distribution (i.e. full retrain) and the unlearning model can be broken into two parts: the KL on the forget set and the KL on the retain set. The original pretrained model is used as the teacher and the output distribution is modified by masking out the specific class to be forgotten. Then the student model tries to learn this modified masked distribution. 
+This ensures that the student model forgets the specific class while still retaining performance on the other classes. 
 
+ 
 \subsection{Kaggle 2023 Winner}
 \textbf{Kaggle 2023 Winner (Fanchuan)} [\cite{2023-winner}]: Fanchuan is a two-stage unlearning algorithm. In the first stage, the algorithm minimizes the KL divergence of the models output on the forget set and a uniform distribution. This encourages the model to produce less confident predictions on the forget set. In the second stage, the algorithm performs adversial fine tuning using contrastive learning to push the forget samples away from the retain samples in the feature space. They simultaneously also reduce the cross entropy loss on the retain set to preserve performance on the retain set. 
 
@@ -342,6 +346,8 @@ Held-out validation and test sets are strictly maintained to measure generalizat
 
 Figure~\ref{fig:pipeline} summarizes our benchmark pipeline. For each dataset, we first construct deterministic \texttt{train}, \texttt{val}, \texttt{test}, \texttt{forget}, and \texttt{retrain} splits to prevent data leakage between tuning and evaluation. We then run a single hyperparameter grid search for ResNet-18 (no-pretrained weights), reuse the selected configuration for both the Train and Retrain model banks, and evaluate each setting over matched three-seed runs. This design keeps the comparison fair by avoiding extra tuning for either bank, reduces variance from random initialization, and provides a clean retrained reference trained only on \texttt{retrain} against which approximate unlearning methods can be judged.
 
+Our code is implemented in PyTorch and is available at \url{https://github.com/Kevinktv/CPSC550_Project}.
+
 
 % To accommodate smaller image resolutions without suffering from spatial detail collapse, the ResNet-18 stem is modified for $32 \times 32$ inputs by replacing the initial $7 \times 7$ convolution with a $3 \times 3$ kernel and swapping the max-pooling layer with an identity mapping. For larger inputs, the standard ResNet-18 stem is preserved.
 
@@ -393,7 +399,7 @@ This final formulation scales the forgetting quality $\mathcal{F}$ by the utilit
 
 \section{Discussion and future work}
 
-The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the Train model bank, which is trained on the full training split rather than produced by an unlearning method, still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable, because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
+Table \ref{tab:appendixBenchmarkCifar10} and \ref{tab:appendixBenchmarkMufac} show the results of our experiments of the CIFAR10 and MUFAC datasets. The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the Train model bank, which is trained on the full training split rather than produced by an unlearning method, still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable, because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
 
 \begin{figure}[htbp]
     \centering
