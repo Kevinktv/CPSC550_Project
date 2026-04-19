@@ -354,18 +354,20 @@ Our code is implemented in PyTorch and is available at \url{https://github.com/K
 \subsection{Evaluation}
 To strictly evaluate the qualitative performance of the approximate unlearning methods, we utilize an extensive benchmark pipeline that directly follows the \textbf{NeurIPS 2023 Machine Unlearning Competition} methodology \citep{neurips-2023-machine-unlearning}.
 
-The evaluation protocol tests the algorithms over predefined seed banks and enforces a hard time-efficiency threshold. The performance is quantified through a four-step calculation:
+The goal is to measure how closely an unlearned model matches a model retrained from scratch on the retained dataset $D \setminus S$. A successful unlearning method should produce outputs that are indistinguishable from this retrained baseline while preserving utility and improving efficiency.
 
 \subsubsection*{Step 1: Estimating Per-Example Indistinguishability ($\epsilon^s$)}
-Because it is computationally intractable to measure exact indistinguishability for the entire model, the evaluation estimates an $\epsilon$ value for each individual example $s$ in the forget set $S$. We apply various ``attacks'' on the model outputs to distinguish unlearned models from retrained baselines, generating a False Positive Rate (FPR) and a False Negative Rate (FNR). For each attack, the privacy parameters are estimated as:
+
+As mentioned earlier, it is intractable to compare full model distributions, so indistinguishability is estimated per example $s \in S$. We apply various ``attacks'' on the model outputs to distinguish outputs of unlearned models from retrained models, yielding a False Positive Rate (FPR) and False Negative Rate (FNR). For each attack:
 \begin{align}
     \epsilon_1 &= \log(1 - \delta - \text{FPR}) - \log(\text{FNR}) \\
     \epsilon_2 &= \log(1 - \delta - \text{FNR}) - \log(\text{FPR})
 \end{align}
-The final $\epsilon^s$ for that specific example is derived from the maximum value (representing the worst-case, strongest attack):
+The final score - $\epsilon^s$ for example $s$ is derived from the maximum value (representing the worst-case, strongest attack):
 \begin{equation}
     \epsilon^s = \max(\epsilon_1, \epsilon_2)
 \end{equation}
+Smaller $\epsilon^s$ indicates better forgetting quality.
 
 \subsubsection*{Step 2: Calculating Forgetting Quality ($\mathcal{F}$)}
 Once $\epsilon^s$ is calculated, it is mapped to a scoring function $\mathcal{H}(s)$. The function places the $\epsilon^s$ value into a predefined ``bin'' indexed as $n(s)$. The assigned score decays exponentially as the required $\epsilon$ bound increases:
