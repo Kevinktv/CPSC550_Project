@@ -100,15 +100,15 @@ We evaluate these methods on two image classification datasets: CIFAR-10 [\cite{
 \begin{itemize}
     \item \textbf{Utility.} This measures how well the model performs on data that should be retained. It is typically evaluated using standard metrics such as accuracy on the retained set and a held-out test set.
     
-    \item \textbf{Forgetting quality (completeness).} This evaluates whether the influence of the removed samples has been eliminated. Common approaches compare the unlearned model to a model retrained from scratch, or measure performance degradation on the unlearning set.
+    \item \textbf{Forgetting quality (indistinguishability).} This evaluates whether the influence of the removed samples has been eliminated. The model produced by the unlearning algorithm must be indistinguishable from a model retrained from scratch on the remaining data. 
     
-    \item \textbf{Efficiency.} This captures the computational advantage of the unlearning algorithm compared to retraining. 
+    \item \textbf{Efficiency.} This captures the computational advantage of the unlearning algorithm compared to full retraining. 
     
     \item \textbf{Privacy leakage.} This assesses whether information about the removed data can still be extracted from the model. 
 \end{itemize}
 In this project, we focus on the first three components and use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition \citep{neurips-2023-machine-unlearning}.
 
-\section{Problem Setup}
+\section{Problem Setup} \label{sec:problem_setup}
 We base our problem setup on \cite{li2025overview}. We begin with some notation and definitions. Let $Z$ be the set of all data points and $Z^*$ be the set of all possible training datasets. Let $H$ be the set of all possible hypotheses (i.e. parameters). We define
 \begin{definition}[Learning Algorithm]
     A learning algorithm $A: Z^* \to H$ maps a training dataset to a hypothesis. If $D \in Z^*$, then $A(D)$ is the model obtained by training on $D$.
@@ -123,14 +123,14 @@ i.e.
 \begin{equation}
     \Pr[A(D')] \approx \Pr[U(A(D), D, S)]
 \end{equation} 
-Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. In this project, we use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition. Additional details about the evaluation protocol is described in \textcolor{red}{todo: add reference to description of evaluation protocol}
+Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. In this project, we use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition. Additional details about the evaluation protocol is described in \Cref{subsec:evaluation}.
 
 \section{Unlearning Algorithms and Evaluation Metric}
 Below, we briefly summarize the unlearning algorithms that we benchmarked in this project and provide background on the evaluation metrics we used to compare their performance.
 
 \subsection{SCRUB}
 \textbf{SCalable Remembering and Unlearning unBound (SCRUB)} [\cite{kurmanji2023unboundedmachineunlearning}]: SCRUB is an unlearning algorithm that utilizes a teacher-student framework. Initially, both the teacher and student models are initialized with the same set of weights. The goal is for the student to "obey" the teacher for the retain set and "disobey" the teacher for the forget set. 
-To achieve this, SCRUB uses a loss function that encourages the student to produce similar outputs to the teacher on the retain set, while producing different outputs on the forget set. The final component of the loss function is the loss on the retain set, which encourages the student to perform well on it. By optimizing this loss function, SCRUB effectively unlearns the forget set while retaining performance on the retain set.
+To achieve this, SCRUB uses a loss function that encourages the student to produce similar outputs to the teacher on the retain set, while producing different outputs on the forget set. The final component of the loss function is the loss purely on the retain set, which encourages the student to perform well on it. By optimizing this loss function, SCRUB effectively unlearns the forget set while retaining performance on the retain set.
 
 \subsection{DELETE}
 \textbf{DEcoupLEd Distillation To Erase (DELETE)} [\cite{zhou2025decoupleddistillationerasegeneral}]: DELETE is also an unlearning algorithm that is based on knowledge distillation/teacher-student framework. In the paper, they showed that the KL between the target probability distribution (i.e. full retrain) and the unlearning model can be broken into two parts: the KL on the forget set and the KL on the retain set. The original pretrained model is used as the teacher and the output distribution is modified by masking out the specific class to be forgotten. Then the student model tries to learn this modified masked distribution. 
@@ -147,18 +147,20 @@ does not help distinguish between the forget and retain sets. Hence, MSG reiniti
 \section{Experimental Setup}
 Below, we describe our experimental setup, including the model architecture, dataset and training pipeline.
 
+Our code is implemented in PyTorch and is available at \url{https://github.com/Kevinktv/CPSC550_Project}.
+
 \subsection{Model architecture and datasets}
-For our base architecture, we utilize a ResNet-18 model with no pre-trained weights. To ensure optimal performance, we independently tune hyperparameters for each dataset via a small grid search on a dedicated validation set. Full details of this tuning process can be found in \Cref{fig:hyperparameterTuning}. Details regarding the training pipeline can be found in \Cref{sec:training_pipeline}.
+For our base architecture, we utilize a ResNet-18 model with no pre-trained weights. 
 
 We evaluate the unlearning algorithms across three primary image classification datasets: Kaggle Machine Unlearning Dataset \citep{neurips-2023-machine-unlearning}, CIFAR-10 \citep{Krizhevsky09learningmultiple}, MUFAC \citep{choi2023machine}.
 
-For the unlearning task, the training partition is divided into two mutually exclusive sets:
+For the unlearning task, the training data is divided into two mutually exclusive sets:
 \begin{enumerate}
     \item \textbf{Forget Set ($S$):} A subset of the training data selected to be unlearned. Our generation pipeline builds a mixed-label unlearning task that proportionally targets specific classes or targets a globally defined forget percentage.
     \item \textbf{Retain Set ($D \setminus S$):} The remaining data from the training partition, representing the data the model must preserve.
 \end{enumerate}
 
-Held-out validation and test sets are strictly maintained to measure generalization during unlearning.
+Held-out validation to tune hyperparameters and test sets are strictly maintained to measure generalization during unlearning. Full details of this tuning process can be found in \Cref{fig:hyperparameterTuning}.
 
 
 \subsection{Training pipeline}\label{sec:training_pipeline}
@@ -346,41 +348,38 @@ Held-out validation and test sets are strictly maintained to measure generalizat
 
 Figure~\ref{fig:pipeline} summarizes our benchmark pipeline. For each dataset, we first construct deterministic \texttt{train}, \texttt{val}, \texttt{test}, \texttt{forget}, and \texttt{retrain} splits to prevent data leakage between tuning and evaluation. We then run a single hyperparameter grid search for ResNet-18 (no-pretrained weights), reuse the selected configuration for both the Train and Retrain model banks, and evaluate each setting over matched three-seed runs. This design keeps the comparison fair by avoiding extra tuning for either bank, reduces variance from random initialization, and provides a clean retrained reference trained only on \texttt{retrain} against which approximate unlearning methods can be judged.
 
-Our code is implemented in PyTorch and is available at \url{https://github.com/Kevinktv/CPSC550_Project}.
-
 
 % To accommodate smaller image resolutions without suffering from spatial detail collapse, the ResNet-18 stem is modified for $32 \times 32$ inputs by replacing the initial $7 \times 7$ convolution with a $3 \times 3$ kernel and swapping the max-pooling layer with an identity mapping. For larger inputs, the standard ResNet-18 stem is preserved.
 
-\subsection{Evaluation}
-To strictly evaluate the qualitative performance of the approximate unlearning methods, we utilize an extensive benchmark pipeline that directly follows the \textbf{NeurIPS 2023 Machine Unlearning Competition} methodology \citep{neurips-2023-machine-unlearning}.
+\subsection{Evaluation}\label{subsec:evaluation}
+To evaluate the performance of the unlearning methods, we utilize an evaluation criterion that follows the \textbf{NeurIPS 2023 Machine Unlearning Competition} methodology \citep{neurips-2023-machine-unlearning}.
 
 The goal is to measure how closely an unlearned model matches a model retrained from scratch on the retained dataset $D \setminus S$. A successful unlearning method should produce outputs that are indistinguishable from this retrained baseline while preserving utility and improving efficiency.
 
+
+
 \subsubsection*{Step 1: Estimating Per-Example Indistinguishability ($\epsilon^s$)}
 
-As mentioned earlier, it is intractable to compare full model distributions, so indistinguishability is estimated per example $s \in S$. We apply various ``attacks'' on the model outputs to distinguish outputs of unlearned models from retrained models, yielding a False Positive Rate (FPR) and False Negative Rate (FNR). For each attack:
-\begin{align}
-    \epsilon_1 &= \log(1 - \delta - \text{FPR}) - \log(\text{FNR}) \\
-    \epsilon_2 &= \log(1 - \delta - \text{FNR}) - \log(\text{FPR})
-\end{align}
-The final score - $\epsilon^s$ for example $s$ is derived from the maximum value (representing the worst-case, strongest attack):
-\begin{equation}
-    \epsilon^s = \max(\epsilon_1, \epsilon_2)
-\end{equation}
-Smaller $\epsilon^s$ indicates better forgetting quality.
+As mentioned in \Cref{sec:problem_setup}, it is not possible to directly compute the indistinguishability, hence, we approximate it. We first compute per-example indistinguishability, that is, whether we can distinguish between the outputs of the unlearned and retrained model on that example. For every example $s \in S$, we apply various ''attacks'' on the model outputs to see whether we can distinguish the models. This yields a False Positive Rate (FPR) and False Negative Rate (FNR). 
+\begin{itemize}
+    \item \textbf{False Positive Rate (FPR):} probability of incorrectly classifying a retrained model as unlearned,
+    \item \textbf{False Negative Rate (FNR):} probability of incorrectly classifying an unlearned model as retrained.
+\end{itemize}
+High FPR and FNR indicate that attacks cannot reliably distinguish between the two models, implying strong indistinguishability. We convert these rates into one final score $\epsilon^s$ where smaller $\epsilon^s$ indicates better indistinguishability. We use the strongest (worst-case) attack for each example.
+
 
 \subsubsection*{Step 2: Calculating Forgetting Quality ($\mathcal{F}$)}
-Once $\epsilon^s$ is calculated, it is mapped to a scoring function $\mathcal{H}(s)$. The function places the $\epsilon^s$ value into a predefined ``bin'' indexed as $n(s)$. The assigned score decays exponentially as the required $\epsilon$ bound increases:
+Once $\epsilon^s$ is calculated, we discretize it into bins, $n(s)$ where smaller $\epsilon^s$ are placed in the smaller bin numbers. We then assign scores to each bin using a scoring function $\mathcal{H}(s)$:
 \begin{equation}
     \mathcal{H}(s) = \frac{2}{2^{n(s)}}
 \end{equation}
-The total forgetting quality, $\mathcal{F}$, is defined as the average of these scores across all examples in the forget set:
+This assigns higher scores to samples with smaller $\epsilon^s$ values. The total forgetting quality, $\mathcal{F}$, is defined as the average of these scores across all examples in the forget set:
 \begin{equation}
     \mathcal{F} = \frac{1}{|S|} \sum_{s \in S} \mathcal{H}(s)
 \end{equation}
 
 \subsubsection*{Step 3: Calculating Model Utility}
-An unlearning algorithm is only viable if the model retains its core predictive utility. Utility is defined by the accuracy of a set of models $O$ on two disjoint datasets: the retain set ($D \setminus S$) and a held-out test set ($T$). 
+We measure utility of a model, $O$ as the accuracy on the retain set ($D \setminus S$) and a held-out test set ($T$). 
 \begin{align}
     \text{Retain Accuracy (RA)}&: \quad RA(O) = \frac{1}{|O|} \sum_{i=1}^{|O|} Acc(O_i, D \setminus S) \\
     \text{Test Accuracy (TA)}&: \quad TA(O) = \frac{1}{|O|} \sum_{i=1}^{|O|} Acc(O_i, T)
@@ -388,13 +387,13 @@ An unlearning algorithm is only viable if the model retains its core predictive 
 We compute these average accuracies for the candidate unlearned models ($RA^U$ and $TA^U$) and compare them directly against the ideal retrained models ($RA^R$ and $TA^R$).
 
 \subsubsection*{Step 4: The Final Combined Score}
-Unlearning algorithms must first pass a hard threshold for time efficiency (operating strictly faster than the time required for full retraining). If the candidate passes the efficiency cutoff, the mathematical components are combined into a final performance score:
+Unlearning algorithms must first pass a hard threshold for time efficiency (strictly faster than retraining). If the candidate passes the efficiency cutoff, the mathematical components are combined into a final performance score:
 \begin{equation}
     \text{Score} = \mathcal{F} \times \frac{RA^U}{RA^R} \times \frac{TA^U}{TA^R}
 \end{equation}
 This final formulation scales the forgetting quality $\mathcal{F}$ by the utility ratios. It explicitly penalizes the score if the unlearned model performs worse than the perfectly retrained model on the retain or test distributions. The resulting score is strictly bounded in the range $[0, 1]$:
 \begin{itemize}
-    \item A score approaching \textbf{1.0} indicates a flawless unlearner that seamlessly mimics a retrained model without utility loss.
+    \item A score approaching \textbf{1.0} indicates a flawless unlearner that mimics a retrained model without utility loss.
     \item A score approaching \textbf{0.0} signifies that the algorithm either failed to effectively forget the targeted data, completely collapsed the model's accuracy, or failed the runtime efficiency requirements.
 \end{itemize}
 
@@ -418,8 +417,6 @@ Several limitations of our current study point directly to future work. We only 
 In this report, we benchmarked several approximate machine unlearning algorithms against a retraining baseline on two image classification datasets. We also provided an overview of common unlearning approaches and the evaluation criteria used to assess them. Our evaluation focused on three key metrics: forgetting quality, utility retention, and runtime efficiency.
 
 Our results show that while many methods achieve strong performance along one or two of these dimensions, only Masked-Small-Gradients (MSG) consistently balances all three, achieving the best overall performance across both datasets. This highlights the importance of multiple factors when considering the practical viability of unlearning algorithms, as a method that is fast but fails to forget effectively may not be useful in real-world applications whereas a method that forgets well but is too slow will not be scalable to modern large models.
-
-In future work, we plan to expand our benchmark to include more datasets, different unlearning tasks, and a wider variety of model architectures. 
 
 \printbibliography
 
