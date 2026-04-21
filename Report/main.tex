@@ -76,18 +76,18 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-In this report, we present a survey and empirical benchmark of several approximate machine unlearning algorithms against a retraining baseline. We evaluate these methods on two image classification datasets, CIFAR-10 and MUFAC, using an evaluation protocol inspired by the \cite{neurips-2023-machine-unlearning}. 
+In this report, we present a survey and empirical benchmark of several approximate machine unlearning algorithms against a retraining baseline. We evaluate these methods on two image classification datasets, CIFAR-10 and MUFAC, using an evaluation protocol inspired by the NeurIPS 2023 Machine Unlearning Competition [\cite{neurips-2023-machine-unlearning}].
 
 Specifically, we consider four algorithms: SCRUB, DELETE, the 2023 Kaggle first-place solution (Fanchuan), and the 2023 Kaggle second-place solution (MSG). Our study provides a comparative analysis of their performance in terms of forgetting quality, utility retention, and computational efficiency.
 \end{abstract}
 
 \section{Introduction}
 As machine learning models are increasingly deployed in real-world systems, the ability to unlearn specific data from trained models has become a critical requirement for privacy and security reasons. Machine unlearning refers to the process of removing the influence of specific data points from a trained model, effectively forgetting that data. 
-In 2023, California signed in the DELETE Act [\cite{delete_act}], which requires data brokers to delete personal information upon request. Bill C-27, which is currently being debated in the Canadian parliament, plans to modernize privacy laws especially in the context of AI and machine learning. These laws highlight the importance of machine unlearning and the need for efficient algorithms to achieve it.
+In 2023, California signed the DELETE Act [\cite{delete_act}], which requires data brokers to delete personal information upon request. Bill C-27, which is currently being debated in the Canadian parliament, plans to modernize privacy laws especially in the context of AI and machine learning. These laws highlight the importance of machine unlearning and the need for efficient algorithms to achieve it.
 
 In an ideal world, the best way to unlearn data from a model is to retrain the model from scratch on the remaining data. This ensures that the model has no knowledge of the data that was removed. However, retraining can be computationally expensive and time-consuming, especially for large models and datasets. Therefore, there is a growing interest in developing efficient unlearning algorithms that can approximate the effect of a full retrain.
 
-This project aims to benchmark several recent approximate machine unlearning algorithms against a retraining baseline. We focus on image classification tasks, and will be focusing on the following unlearning algorithms: 
+This project aims to benchmark several recent approximate machine unlearning algorithms against a retraining baseline. We focus on image classification tasks, and evaluate the following unlearning algorithms: 
 SCalable Remembering and Unlearning unBound (SCRUB) [\cite{kurmanji2023unboundedmachineunlearning}], DEcoupLEd Distillation To Erase (DELETE) [\cite{zhou2025decoupleddistillationerasegeneral}], the 2023 Kaggle 1st place winner (Fanchuan) [\cite{2023-winner}], and the 2023 Kaggle 2nd place winner (MSG) [\cite{2023-second-place}] where the acronym MSG (Masked Small Gradients) follows the naming convention used in \citet{cadet2025}. 
 We evaluate these methods on two image classification datasets: CIFAR-10 [\cite{Krizhevsky09learningmultiple}] and MUFAC [\cite{choi2023machine}]. We use an evaluation metric inspired by the NeurIPS 2023 Machine Unlearning Competition, which combines measures of forgetting quality, utility retention, and runtime efficiency into a single score.
 
@@ -133,12 +133,12 @@ Below, we briefly summarize the unlearning algorithms that we benchmarked in thi
 To achieve this, SCRUB uses a loss function that encourages the student to produce similar outputs to the teacher on the retain set, while producing different outputs on the forget set. The final component of the loss function is the loss purely on the retain set, which encourages the student to perform well on it. By optimizing this loss function, SCRUB effectively unlearns the forget set while retaining performance on the retain set.
 
 \subsection{DELETE}
-\textbf{DEcoupLEd Distillation To Erase (DELETE)} [\cite{zhou2025decoupleddistillationerasegeneral}]: DELETE is also an unlearning algorithm that is based on knowledge distillation/teacher-student framework. In the paper, they showed that the KL between the target probability distribution (i.e. full retrain) and the unlearning model can be broken into two parts: the KL on the forget set and the KL on the retain set. The original pretrained model is used as the teacher and the output distribution is modified by masking out the specific class to be forgotten. Then the student model tries to learn this modified masked distribution. 
+\textbf{DEcoupLEd Distillation To Erase (DELETE)} [\cite{zhou2025decoupleddistillationerasegeneral}]: DELETE is also an unlearning algorithm that is based on knowledge distillation/teacher-student framework. In the paper, they showed that the KL between the target probability distribution (i.e. full retrain) and the unlearned model can be broken into two parts: the KL on the forget set and the KL on the retain set. The original pretrained model is used as the teacher and the output distribution is modified by masking out the specific class to be forgotten. Then the student model tries to learn this modified masked distribution. 
 This ensures that the student model forgets the specific class while still retaining performance on the other classes. 
 
  
 \subsection{Kaggle 2023 Winner}
-\textbf{Kaggle 2023 Winner (Fanchuan)} [\cite{2023-winner}]: Fanchuan is a two-stage unlearning algorithm. In the first stage, the algorithm minimizes the KL divergence of the models output on the forget set and a uniform distribution. This encourages the model to produce less confident predictions on the forget set. In the second stage, the algorithm performs adversial fine tuning using contrastive learning to push the forget samples away from the retain samples in the feature space. They simultaneously also reduce the cross entropy loss on the retain set to preserve performance on the retain set. 
+\textbf{Kaggle 2023 Winner (Fanchuan)} [\cite{2023-winner}]: Fanchuan is a two-stage unlearning algorithm. In the first stage, the algorithm minimizes the KL divergence of the model's output on the forget set and a uniform distribution. This encourages the model to produce less confident predictions on the forget set. In the second stage, the algorithm performs adversarial fine tuning using contrastive learning to push the forget samples away from the retain samples in the feature space. They simultaneously also reduce the cross entropy loss on the retain set to preserve performance on the retain set. 
 
 \subsection{Kaggle 2023 runner up (Masked-Small-Gradients)}
 \textbf{Masked-Small-Gradients (MSG)} [\cite{2023-second-place}]: In MSG, the unlearning process hinges on identifying weights in the model that influence both the forget set and the retain set and do not distinguish between them. The algorithm first computes the gradients of the loss with respect to the model parameters for both the forget set and the retain set. Weights with small gradient magnitudes indicate that the specific weight 
@@ -360,10 +360,10 @@ The goal is to measure how closely an unlearned model matches a model retrained 
 
 \subsubsection*{Step 1: Estimating Per-Example Indistinguishability ($\epsilon^s$)}
 
-As mentioned in \Cref{sec:problem_setup}, it is not possible to directly compute the indistinguishability, hence, we approximate it. We first compute per-example indistinguishability, that is, whether we can distinguish between the outputs of the unlearned and retrained model on that example. For every example $s \in S$, we apply various ''attacks'' on the model outputs to see whether we can distinguish the models. This yields a False Positive Rate (FPR) and False Negative Rate (FNR). 
+As mentioned in \Cref{sec:problem_setup}, it is not possible to directly compute indistinguishability; hence, we approximate it. We first compute per-example indistinguishability, that is, whether we can distinguish between the outputs of the unlearned and retrained model on that example. For every example $s \in S$, we apply various ''attacks'' on the model outputs to see whether we can distinguish the models. This yields a False Positive Rate (FPR) and False Negative Rate (FNR). 
 \begin{itemize}
-    \item \textbf{False Positive Rate (FPR):} probability of incorrectly classifying a retrained model as unlearned,
-    \item \textbf{False Negative Rate (FNR):} probability of incorrectly classifying an unlearned model as retrained.
+    \item \textbf{False Positive Rate (FPR):} Probability of incorrectly classifying a retrained model as unlearned,
+    \item \textbf{False Negative Rate (FNR):} Probability of incorrectly classifying an unlearned model as retrained.
 \end{itemize}
 High FPR and FNR indicate that attacks cannot reliably distinguish between the two models, implying strong indistinguishability. We convert these rates into one final score $\epsilon^s$ where smaller $\epsilon^s$ indicates better indistinguishability. We use the strongest (worst-case) attack for each example.
 
@@ -400,7 +400,7 @@ This final formulation scales the forgetting quality $\mathcal{F}$ by the utilit
 
 \section{Discussion and future work}
 
-Table \ref{tab:appendixBenchmarkCifar10} and \ref{tab:appendixBenchmarkMufac} show the results of our experiments of the CIFAR10 and MUFAC datasets. The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the Train model bank, which is trained on the full training split rather than produced by an unlearning method, still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable, because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
+Table \ref{tab:appendixBenchmarkCifar10} and \ref{tab:appendixBenchmarkMufac} show the results of our experiments of the CIFAR-10 and MUFAC datasets. The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the Train model bank, which is trained on the full training split rather than produced by an unlearning method, still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable, because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
 
 \begin{figure}[htbp]
     \centering
@@ -447,14 +447,14 @@ The task is not class-uniform. Instead, it deterministically selects the most fr
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=1\linewidth]{figures/cifar-hyperparameter-tuning.png}
-    \caption{Cifar-10 Hyperparmeter tuning for Resnet18}
+    \caption{CIFAR-10 Hyperparameter tuning for ResNet-18}
     \label{fig:hyperparameterTuning}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=1\linewidth]{figures/mufac-hyperparameter-tuning.png}
-    \caption{MUFAC Hyperparmeter tuning for Resnet18}
+    \caption{MUFAC Hyperparameter tuning for ResNet-18}
     \label{fig:hyperparameterTuning2}
 \end{figure}
 
