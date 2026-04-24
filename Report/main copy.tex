@@ -83,7 +83,7 @@ Specifically, we consider four algorithms: SCRUB, DELETE, the 2023 Kaggle first-
 
 \section{Introduction}
 As machine learning models are increasingly deployed in real-world systems, the ability to unlearn specific data from trained models has become a critical requirement for privacy and security reasons. Machine unlearning refers to the process of removing the influence of specific data points from a trained model, effectively forgetting that data. 
-In 2023, California signed the DELETE Act [\cite{delete_act}], which requires data brokers to delete personal information upon request. Bill C-27, which is currently being debated in the Canadian parliament, plans to modernize privacy laws especially in the context of AI and machine learning. These laws highlight the importance of machine unlearning and the need for efficient algorithms to achieve it.
+In 2023, California signed the DELETE Act [\cite{delete_act}], which requires data brokers to delete personal information upon request. Bill C-27, which is currently being debated in the Canadian parliament, plans to modernize privacy laws, especially in the context of AI and machine learning. These laws highlight the importance of machine unlearning and the need for efficient algorithms to achieve it.
 
 Ideally, unlearning requires retraining a model from scratch on the remaining data to ensure complete removal. However, because full retraining is computationally prohibitive for large datasets, efficient approximate algorithms are increasingly necessary.
 
@@ -92,10 +92,10 @@ SCalable Remembering and Unlearning unBound (SCRUB) [\cite{kurmanji2023unbounded
 We evaluate these methods on two image classification datasets: CIFAR-10 [\cite{Krizhevsky09learningmultiple}] and MUFAC [\cite{choi2023machine}]. We use an evaluation metric inspired by the NeurIPS 2023 Machine Unlearning Competition, which combines measures of forgetting quality, utility retention, and runtime efficiency into a single score.
 
 \section{Related Work}
-\textbf{Machine Unlearning.} In machine unlearning, our goal is to remove the influence of specific data points from a trained model \citep{bourtoule2021machine, zhang2023review}. \citet{cao2015towards} proposed a method of unlearning based on reformulating the learning algorithm into a summation based form and unlearning by subtracting contributions of specific summands. However, this approach requires that the learning algorithm be expressible in a summation form which is not feasible for most modern deep learning models. 
+\textbf{Machine Unlearning.} In machine unlearning, our goal is to remove the influence of specific data points from a trained model \citep{bourtoule2021machine, zhang2023review}. \citet{cao2015towards} proposed a method of unlearning based on reformulating the learning algorithm into a summation-based form and unlearning by subtracting contributions of specific summands. However, this approach requires that the learning algorithm be expressible in a summation form which is not feasible for most modern deep learning models. 
 \cite{bourtoule2021machine} proposed a method called SISA (Sharded, Isolated, Sliced, and Aggregated) training, which partitions the training data into shards and trains separate models on each shard. To unlearn a data point, only the model trained on the shard containing that data point needs to be retrained. However, as the number of shards increases, the performance of the model degrades. Recently, several new algorithms have been proposed that aim to achieve better performance while still being efficient and scalable \citep{cadet2025, kurmanji2023unboundedmachineunlearning, zhou2025decoupleddistillationerasegeneral}.
 
-\textbf{Evaluation Metrics.} Ideally, evaluating unlearning algorithms requires measuring how close the distribution of the unlearned model is to the distribution of a model retrained from scratch on the remaining data. However, this is not feasible in practice since we do not have access to the true distributions. Evaluation metrics are usually based on the following components \citep{li2025overview}: 
+\textbf{Evaluation Metrics.} Ideally, evaluating unlearning algorithms requires measuring how close the distribution of the unlearned model is to the distribution of a model retrained from scratch on the remaining data. However, this is not feasible in practice since we do not have access to the true, distributions. Evaluation metrics are usually based on the following components \citep{li2025overview}: 
 
 \begin{itemize}
     \item \textbf{Utility.} This measures how well the model performs on data that should be retained. It is typically evaluated using standard metrics such as accuracy on the retained set and a held-out test set.
@@ -123,7 +123,7 @@ i.e.
 \begin{equation}
     \Pr[A(D')] \approx \Pr[U(A(D), D, S)]
 \end{equation} 
-Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. In this project, we use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition. Additional details about the evaluation protocol is described in \Cref{subsec:evaluation}.
+Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. In this project, we use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition. Additional details about the evaluation protocol are described in \Cref{subsec:evaluation}.
 
 \section{Unlearning Algorithms and Evaluation Metric}
 Below, we briefly summarize the unlearning algorithms that we benchmarked in this project.
@@ -133,16 +133,16 @@ Below, we briefly summarize the unlearning algorithms that we benchmarked in thi
 To achieve this, SCRUB uses a loss function that encourages the student to produce similar outputs to the teacher on the retain set, while producing different outputs on the forget set. The final component of the loss function is the loss purely on the retain set, which encourages the student to perform well on it. By optimizing this loss function, SCRUB effectively unlearns the forget set while retaining performance on the retain set.
 
 \subsection{DELETE}
-\textbf{DEcoupLEd Distillation To Erase (DELETE)} [\cite{zhou2025decoupleddistillationerasegeneral}]: DELETE is also an unlearning algorithm that is based on knowledge distillation/teacher-student framework. In the paper, they showed that the KL between the target probability distribution (i.e. full retrain) and the unlearned model can be broken into two parts: the KL on the forget set and the KL on the retain set. The original pretrained model is used as the teacher and the output distribution is modified by masking out the specific class to be forgotten. Then the student model tries to learn this modified masked distribution. 
+\textbf{DEcoupLEd Distillation To Erase (DELETE)} [\cite{zhou2025decoupleddistillationerasegeneral}]: DELETE is also an unlearning algorithm that is based on the knowledge distillation/teacher-student framework. In the paper, they showed that the KL between the target probability distribution (i.e. full retrain) and the unlearned model can be broken into two parts: the KL on the forget set and the KL on the retain set. The original pretrained model is used as the teacher, and the output distribution is modified by masking out the specific class to be forgotten. Then the student model tries to learn this modified masked distribution. 
 This ensures that the student model forgets the specific class while still retaining performance on the other classes. 
 
  
 \subsection{Kaggle 2023 Winner}
-\textbf{Kaggle 2023 Winner (Fanchuan)} [\cite{2023-winner}]: Fanchuan operates in two stages: first, it minimizes the KL divergence of the model's output on the forget set and a uniform distribution. This encourages the model to produce less confident predictions on the forget set. In the second stage, the algorithm performs adversarial fine tuning using contrastive learning to push the forget samples away from the retain samples in the feature space. They simultaneously also reduce the cross entropy loss on the retain set to preserve performance on the retain set. 
+\textbf{Kaggle 2023 Winner (Fanchuan)} [\cite{2023-winner}]: Fanchuan operates in two stages: first, it minimizes the KL divergence of the model's output on the forget set and a uniform distribution. This encourages the model to produce less confident predictions on the forget set. In the second stage, the algorithm performs adversarial fine-tuning using contrastive learning to push the forget samples away from the retain samples in the feature space. They simultaneously also reduce the cross-entropy loss on the retain set to preserve performance on the retain set. 
 
 \subsection{Kaggle 2023 runner up (Masked-Small-Gradients)}
-\textbf{Masked-Small-Gradients (MSG)} [\cite{2023-second-place}]: In MSG, the unlearning process hinges on identifying weights in the model that influence both the forget set and the retain set and do not distinguish between them. The algorithm first computes the gradients of the loss with respect to the model parameters for both the forget set and the retain set. Weights with small gradient magnitudes indicate that the specific weight 
-does not help distinguish between the forget and retain sets. Hence, MSG reinitializes these weights, and then retrains these weights on the retain set while keeping the other weights fixed. This approach avoids a full retraining by only updating a subset of the model parameters that are deemed less important for distinguishing the forget set from the retain set.
+\textbf{Masked-Small-Gradients (MSG)} [\cite{2023-second-place}]: In MSG, the unlearning process hinges on identifying weights in the model that influence both the forget set and the retain set and do not distinguish between them. The algorithm first computes the gradients of the loss with respect to the model parameters for both the forget set and the retain set. Weights with small gradient magnitudes indicate that the specific weight. 
+does not help distinguish between the forget and retain sets. Hence, MSG reinitializes these weights and then retrains these weights on the retain set while keeping the other weights fixed. This approach avoids a full retraining by only updating a subset of the model parameters that are deemed less important for distinguishing the forget set from the retain set.
 
 \section{Experimental Setup}
 \begin{figure}[htbp]
@@ -362,11 +362,11 @@ As mentioned in \Cref{sec:problem_setup}, it is not possible to directly compute
     \item \textbf{False Positive Rate (FPR):} Probability of incorrectly classifying a retrained model as unlearned,
     \item \textbf{False Negative Rate (FNR):} Probability of incorrectly classifying an unlearned model as retrained.
 \end{itemize}
-High FPR and FNR indicate that attacks cannot reliably distinguish between the two models, implying strong indistinguishability. We convert these rates into one final score $\epsilon^s$ where smaller $\epsilon^s$ indicates better indistinguishability. We use the strongest (worst-case) attack for each example.
+High FPR and FNR indicate that attacks cannot reliably distinguish between the two models, implying strong indistinguishability. We convert these rates into one final score $\epsilon^s$, where a smaller $\epsilon^s$ indicates better indistinguishability. We use the strongest (worst-case) attack for each example.
 
 
 \subsubsection*{Step 2: Calculating Forgetting Quality ($\mathcal{F}$)}
-Once $\epsilon^s$ is calculated, we discretize it into bins, $n(s)$ where smaller $\epsilon^s$ are placed in the smaller bin numbers. We then assign scores to each bin using a scoring function $\mathcal{H}(s)$:
+Once $\epsilon^s$ is calculated, we discretize it into bins, $n(s)$, where smaller $\epsilon^s$ are placed in the smaller bin numbers. We then assign scores to each bin using a scoring function $\mathcal{H}(s)$:
 \begin{equation}
     \mathcal{H}(s) = \frac{2}{2^{n(s)}}
 \end{equation}
@@ -376,7 +376,7 @@ This assigns higher scores to samples with smaller $\epsilon^s$ values. The tota
 \end{equation}
 
 \subsubsection*{Step 3: Calculating Model Utility}
-We measure utility of a model, $O$ as the accuracy on the retain set ($D \setminus S$) and a held-out test set ($T$). 
+We measure the utility of a model, $O$, as the accuracy on the retain set ($D \setminus S$) and a held-out test set ($T$). 
 \begin{align}
     \text{Retain Accuracy (RA)}&: \quad RA(O) = \frac{1}{|O|} \sum_{i=1}^{|O|} Acc(O_i, D \setminus S) \\
     \text{Test Accuracy (TA)}&: \quad TA(O) = \frac{1}{|O|} \sum_{i=1}^{|O|} Acc(O_i, T)
@@ -428,7 +428,7 @@ This final formulation scales the forgetting quality $\mathcal{F}$ by the utilit
     }
 \end{table}
 
-Table \ref{tab:benchmarkSummary} show the results of our experiments of the CIFAR-10 and MUFAC datasets. The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the Train model bank, which is trained on the full training split rather than produced by an unlearning method, still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable, because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
+Table \ref{tab:benchmarkSummary} shows the results of our experiments on the CIFAR-10 and MUFAC datasets. The benchmark results show that \textbf{MSG} is the only method that remains competitive across both datasets when forgetting quality, utility retention, and runtime are combined into a single score. It achieves the best final score on CIFAR-10 ($0.2646$) and MUFAC ($0.2742$), while running roughly $8.0\times$ and $9.4\times$ faster than retraining, respectively. Its retain accuracy remains very close to the retrained reference on both datasets, and its test accuracy changes only modestly, making it the most balanced unlearning method in our study. \Cref{fig:benchmarkTradeoffs} also highlights an important property of the evaluation itself: the Train model bank, which is trained on the full training split rather than produced by an unlearning method, still attains nonzero raw scores ($0.2120$ on CIFAR-10 and $0.0850$ on MUFAC), but it fails the efficiency cutoff and is therefore disqualified. This is desirable because the benchmark is intended to reward practical unlearning rather than strong accuracy alone.
 
 \begin{figure}[htbp]
     \centering
@@ -445,7 +445,7 @@ Several limitations guide our future work. First, our evaluation is constrained 
 \section{Conclusion}
 In this report, we benchmarked several approximate machine unlearning algorithms against a retraining baseline on two image classification datasets. We also provided an overview of common unlearning approaches and the evaluation criteria used to assess them. Our evaluation focused on three key metrics: forgetting quality, utility retention, and runtime efficiency.
 
-Our results show that while many methods achieve strong performance along one or two of these dimensions, only Masked-Small-Gradients (MSG) consistently balances all three, achieving the best overall performance across both datasets. This highlights the importance of multiple factors when considering the practical viability of unlearning algorithms, as a method that is fast but fails to forget effectively may not be useful in real-world applications whereas a method that forgets well but is too slow will not be scalable to modern large models.
+Our results show that while many methods achieve strong performance along one or two of these dimensions, only Masked-Small-Gradients (MSG) consistently balances all three, achieving the best overall performance across both datasets. This highlights the importance of multiple factors when considering the practical viability of unlearning algorithms, as a method that is fast but fails to forget effectively may not be useful in real-world applications, whereas a method that forgets well but is too slow will not be scalable to modern large models.
 
 \printbibliography
 
