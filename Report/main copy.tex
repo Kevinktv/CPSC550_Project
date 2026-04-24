@@ -126,7 +126,7 @@ i.e.
 Of course, we do not have access to the true distributions so there are several metrics that have been proposed to evaluate the performance of unlearning algorithms. In this project, we use the evaluation protocol from the NeurIPS 2023 Machine Unlearning Competition. Additional details about the evaluation protocol is described in \Cref{subsec:evaluation}.
 
 \section{Unlearning Algorithms and Evaluation Metric}
-Below, we briefly summarize the unlearning algorithms that we benchmarked in this project and provide background on the evaluation metrics we used to compare their performance.
+Below, we briefly summarize the unlearning algorithms that we benchmarked in this project.
 
 \subsection{SCRUB}
 \textbf{SCalable Remembering and Unlearning unBound (SCRUB)} [\cite{kurmanji2023unboundedmachineunlearning}]: SCRUB utilizes a teacher-student framework where both models are initialized with identical weights. The goal is for the student to "obey" the teacher for the retain set and "disobey" the teacher for the forget set. 
@@ -473,6 +473,8 @@ The task is not class-uniform. Instead, it deterministically selects the most fr
     \label{fig:mufacForgetMixedHist}
 \end{figure}
 
+\subsection{Hyperparameter tuning}
+\cref{fig:hyperparameterTuning} and \cref{fig:hyperparameterTuning2} show the results of our hyperparameter tuning for ResNet-18 on CIFAR-10 and MUFAC, respectively. 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=1\linewidth]{figures/cifar-hyperparameter-tuning.png}
